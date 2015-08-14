@@ -13,7 +13,7 @@ I wrote this program, `sz`, to make things easy and simple. It automatically tes
 
 ^ This command will compress the first file, uncompress the second, uncompress and untar the third, and create a `.tar.sz` archive of the fourth.  
   
-Also, `sz` will **never** overwrite another file; whenever it creates a new file, if another one exists with the same name, it will rename the new file automatically. For example, when running:  
+Also, `sz` will **never** overwrite another file; whenever it creates a new file, if another one exists with the same name, it will rename the new one automatically. For example, when running:  
 
     sz file.apk
 
