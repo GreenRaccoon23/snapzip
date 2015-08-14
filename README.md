@@ -4,7 +4,7 @@
 ### Clone
     git clone https://github.com/GreenRaccoon23/sz.git
 ### Description
-Simple command-line program to compress files into Snappy archives.  
+Simple command-line program to compress/decompress files into Snappy archives.  
 Written in the language invented by Google, [Go](https://golang.org/), for the compression format invented by Google, [Snappy](https://github.com/google/snappy). [Snappy](https://github.com/google/snappy) aims to be ***FAST*** and stable while still maintaining reasonable compression.  
 ### Usage
 I wrote this program, `sz`, to make things easy and simple. It automatically tests whether a file should be compressed or decompressed (based on file signatures, not just file extensions), which means that commandline switches are unneeded. Just run:  
@@ -21,3 +21,5 @@ if `file.apk.sz` already exists, the compressed file will be named `file(1).apk.
 ### Resources
 I uploaded this program for simplicity's and portability's sake (installation only requires one command and 3 seconds). For a more robust and even faster alternative written in C, go to:  
 [https://github.com/kubo/snzip](https://github.com/kubo/snzip)
+The REAL credit for this program goes to those who've translated the Snappy library into Go:
+[https://github.com/golang/snappy/blob/master/AUTHORS](https://github.com/golang/snappy/blob/master/AUTHORS)
