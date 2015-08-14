@@ -128,6 +128,7 @@ func main() {
 	defer os.Exit(0)
 	//if doSingleArchive
 	for _, f := range trgtFiles {
+		f = filepath.Clean(f)
 		err := analyze(f)
 		if err == nil || doQuiet {
 			continue
@@ -165,16 +166,6 @@ func concat(slc ...string) (concatenated string) {
 	}
 	concatenated = buffer.String()
 	return
-}
-
-// Test whether a string matches at least one in a set of strings.
-func matchesOr(s string, conditions ...string) bool {
-	for _, c := range conditions {
-		if s == c {
-			return true
-		}
-	}
-	return false
 }
 
 // Determine whether a file should be compressed, uncompressed, or
