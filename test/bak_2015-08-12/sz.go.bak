@@ -1,0 +1,1252 @@
+package main
+
+import (
+	"archive/tar"
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"unsafe"
+
+	"github.com/golang/snappy"
+	// syscall "golang.org/x/sys/unix"
+)
+
+var (
+	buffer          bytes.Buffer
+	DoSingleArchive bool
+	DoQuiet         bool
+	//sz = ff06 0000 734e 6150 7059
+	/*tar =
+	xxxx xxxx 0000 0000 0000 0000 0000 0000
+	0000 0000 0000 0000 0000 0000 0000 0000
+	0000 0000 0000 0000 0000 0000 0000 0000
+	0000 0000 0000 0000 0000 0000 0000 0000
+	0000 0000 0000 0000 0000 0000 0000 0000
+	0000 0000 0000 0000 0000 0000 0000 0000
+	0000 0000 3030 3036 3434 2000 3030 3137
+	3530 2000 3030 3031 3434 2000 3030 3030
+	3030 3030 3030 3020 3132 3535 3732 3136
+	3232 3420 3031
+	*/
+)
+
+func init() {
+	/*chkHelp()
+	flags()
+	flagsEval()*/
+}
+
+/*
+// Parse commandline switches and user arguments.
+func flags() {
+	if len(os.Args) < 2 {
+		help(1)
+	}
+	chkHelp()
+	flag.BoolVar(&DoSingleArchive,"s", false, "")
+	flag.BoolVar(&DoQuiet,"q", false, "")
+	Bools := []string{"s","q"}
+	for _, a := range os.Args[1:] {
+		if
+	}
+}
+
+// Check whether user requested help.
+func chkHelp() {
+	if len(os.Args) < 2 {
+		return
+	}
+
+	switch os.Args[1] {
+	case "-h", "h", "help", "--help", "-H", "H", "HELP", "--HELP", "-help", "--h", "--H":
+		help(0)
+	}
+
+}
+
+func help(status int) {
+	defer os.Exit(status)
+	fmt.Println(
+}
+*/
+
+func TEST(messages ...interface{}) {
+	testing := true
+	if testing {
+		print(messages...)
+	}
+}
+
+// Pass to fmt.Println().
+func print(a ...interface{}) {
+	switch len(a) {
+	case 0:
+		fmt.Println()
+	default:
+		fmt.Println(a...)
+	}
+}
+
+// Pass to fmt.Printf().
+func printf(format string, a ...interface{}) {
+	fmt.Printf(format, a...)
+}
+
+// If an error is not empty, print it.
+func logErr(err error) {
+	if err == nil {
+		return
+	}
+	fmt.Println(err)
+}
+
+// Convert a slice into a string.
+func str(slice []string) (concatenated string) {
+	for _, s := range slice {
+		buffer.WriteString(s)
+	}
+	concatenated = buffer.String()
+	buffer.Reset()
+	return
+}
+
+// Convert a string into a slice.
+func slc(args ...string) []string {
+	return args
+}
+
+// Combine any number of strings into one string.
+func concat(args ...string) string {
+	return str(args)
+}
+
+// Create a file if it doesn't exist. Otherwise, just open it.
+func create(filename string, mode int) (*os.File, error) {
+	file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, os.FileMode(mode))
+	return file, err
+}
+
+func main() {
+	defer os.Exit(0)
+	//print(filepath.Dir("a.tar"))
+	//isDir("badtest")
+	//var err error
+	//err = analyze("test")
+	/*
+		err = analyze("badtest")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	*/
+	/*
+		err = compress("a")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	*/
+	/*
+		print("a.tar")
+		file, _ := os.Open("a.tar")
+		if isTar(file) {
+			print("yes")
+		}
+		print("xz.tar")
+		file, _ = os.Open("xz.tar")
+		if isTar(file) {
+			print("yes")
+		}
+		print("raccoon.png.tar")
+		file, _ = os.Open("raccoon.png.tar")
+		if isTar(file) {
+			print("yes")
+		}
+	*/
+	/*
+		name := "a.tar.sz"
+		print(name)
+		file, _ := os.Open(name)
+		if isSz(file) {
+			print("yes")
+		}
+		name = "xz1.tar.sz"
+		print(name)
+		file, _ = os.Open(name)
+		if isSz(file) {
+			print("yes")
+		}
+		name = "a.sz"
+		print(name)
+		file, _ = os.Open(name)
+		if isSz(file) {
+			print("yes")
+		}
+	*/
+	//name := "xz_testtt.tar.sz"
+	//name := "xz_testtt.tar.sz"
+	name := "amdapp-sdk"
+	err := analyze(name)
+	if err != nil {
+		print(err)
+	}
+
+	//compress("xz_testt.tar")
+	//compress("xz_test.tar")
+}
+
+func analyze(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	switch filetype(file) {
+
+	// If the file is a directory, tar it and then compress the new tarball.
+	case "dir":
+		// Tar it.
+		file, err := tarDir(file)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		// Compress it.
+		compressed, err := snap(file)
+		defer compressed.Close()
+		return err
+
+	// If the file is a snappy file, uncompress it.
+	case "sz":
+		// Uncompress it.
+		err := unsnap(file)
+		if err != nil {
+			return err
+		}
+		return err
+
+	// If the file is any other type, compress it.
+	default:
+		// Compress it.
+		compressed, err := snap(file)
+		defer compressed.Close()
+		return err
+	}
+
+	return nil
+}
+
+// Determine the filetype of a file.
+func filetype(file *os.File) string {
+	switch {
+	case isDir(file):
+		return "dir"
+	case isSz(file):
+		return "sz"
+	case isTar(file):
+		return "tar"
+	default:
+		return "other"
+	}
+}
+
+// Check whether a file is a directory.
+func isDir(file *os.File) bool {
+	fi, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.IsDir()
+}
+
+// Check a file's contents for a snappy file signature.
+func isSz(file *os.File) bool {
+	total := 10
+	bytes := make([]byte, total)
+	n, _ := file.ReadAt(bytes, 0)
+	if n < total {
+		return false
+	}
+
+	szSig := []byte{255, 6, 0, 0, 115, 78, 97, 80, 112, 89}
+	for i, b := range bytes {
+		if b != szSig[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Check a file's contents for a tar file signature.
+func isTar(file *os.File) bool {
+	bytes := make([]byte, 5)
+	n, _ := file.ReadAt(bytes, 257)
+	if n < 5 {
+		return false
+	}
+
+	tarSig := []byte{117, 115, 116, 97, 114}
+	for i, b := range bytes {
+		if b != tarSig[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// https://github.com/docker/docker/blob/master/pkg/archive/archive.go
+type tarAppender struct {
+	tarWriter   *tar.Writer
+	bufioWriter *bufio.Writer
+	// Map inodes to hardlinks.
+	hardlinks map[uint64]string
+}
+
+// Create a tar archive of a file.
+func tarFile(src *os.File) (dst *os.File, err error) {
+	if isDir(src) {
+		dst, err = tarDir(src)
+		return
+	}
+
+	// Create the destination file.
+	dstName := concat(src.Name(), ".tar")
+	dst, err = create(dstName, 0777)
+	if err != nil {
+		return
+	}
+
+	// Read the contents of the source file.
+	var srcContents []byte
+	srcContents, err = ioutil.ReadAll(src)
+	if err != nil {
+		return
+	}
+	srcLength := uint64(len(srcContents))
+
+	// Prepare to turn the destination file into a tar archive.
+	dstWriter := &PassThru{Writer: dst, length: srcLength}
+	tarWriter := tar.NewWriter(dstWriter)
+
+	// Write the source file's contents to the new tar archive.
+	print(dstName)
+	_, err = tarWriter.Write(srcContents)
+	print()
+	if err != nil {
+		return
+	}
+
+	// Re-open the modified file.
+	dst, err = os.Open(dstName)
+	return
+}
+
+// Create a tar archive of a file.
+func tarDir(dir *os.File) (dst *os.File, err error) {
+	dirName := dir.Name()
+	// Create the destination file.
+	dstName := concat(dirName, ".tar")
+	dst, err = create(dstName, 0777)
+	if err != nil {
+		return
+	}
+
+	var dstWriter io.WriteCloser = dst
+	ta := &tarAppender{
+		tarWriter:   tar.NewWriter(dstWriter),
+		bufioWriter: bufio.NewWriter(nil),
+		hardlinks:   make(map[uint64]string),
+	}
+
+	defer func() {
+		err = ta.tarWriter.Close()
+	}()
+
+	_, total := dirSize(dirName)
+	root := dirName
+
+	// Walk through the directory.
+	// Add a header to the tar archive for each file encountered.
+	print(dirName)
+	var progress int
+	err = filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		err = ta.add(path, path)
+		if err != nil {
+			return err
+		}
+
+		progress += 1
+		percent := int(float64(progress) / float64(total) * float64(100))
+
+		fmt.Printf("\r%s", strings.Repeat(" ", 50))
+		fmt.Printf("\r  %d / %d files   %d%%", progress, total, percent)
+
+		return nil
+	})
+	print()
+
+	// Re-open the modified file.
+	dst, err = os.Open(dstName)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// Return the total size in bytes and number of files under a directory.
+func dirSize(dir string) (b int64, i int) {
+	filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
+		b += fi.Size()
+		i += 1
+		return nil
+	})
+	return
+}
+
+// https://github.com/docker/docker/blob/master/pkg/archive/archive.go
+func (ta *tarAppender) add(path, name string) error {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+
+	// If the file is a symlink, find its target.
+	var link string
+	if fi.Mode()&os.ModeSymlink != 0 {
+		if link, err = os.Readlink(path); err != nil {
+			return err
+		}
+	}
+
+	// Create the tar header.
+	hdr, err := tar.FileInfoHeader(fi, link)
+	if err != nil {
+		return err
+	}
+
+	// Set the header name.
+	// If the file is a directory, add a trailing "/".
+	if fi.Mode()&os.ModeDir != 0 {
+		fmtDir(&name)
+	}
+	hdr.Name = name
+
+	// Check if the file has hard links.
+	nlink, inode, err := tarSetHeader(hdr, fi.Sys())
+	if err != nil {
+		return err
+	}
+
+	// If any other regular files link to the same inode as this file,
+	//   prepare to treat it as a "hardlink" in the header.
+	// If the tar archive contains another hardlink to this file's inode,
+	//   set it as a "hardlink" in the tar header.
+	// Otherwise, treat it as a regular file.
+	if fi.Mode().IsRegular() && nlink > 1 {
+		// If this file is NOT the first found hardlink to this inode,
+		//   set the previously found hardlink as its 'Linkname'.
+		if oldpath, ok := ta.hardlinks[inode]; ok {
+			hdr.Typeflag = tar.TypeLink
+			hdr.Linkname = oldpath
+			// Set size to 0 when not adding additional inodes.
+			//   Otherwise, the writer's math will not add up correctly.
+			hdr.Size = 0
+
+			// If this file IS the first hardlink to this inode,
+			//   note the file and its inode and treat it as a regular file.
+			// It will become the 'Linkname' for another hardlink
+			//   further down in the archive.
+		} else {
+			ta.hardlinks[inode] = name
+		}
+	}
+
+	// Find any extended atributes (xattr) of the inode
+	//   and set the header accordingly.
+	capability, _ := lgetxattr(path, "security.capability")
+	if capability != nil {
+		hdr.Xattrs = make(map[string]string)
+		hdr.Xattrs["security.capability"] = string(capability)
+	}
+
+	// Write the header.
+	tw := ta.tarWriter
+	if err = tw.WriteHeader(hdr); err != nil {
+		return err
+	}
+
+	// If the file is a regular one,
+	//   i.e., not a symlink, directory, or hardlink,
+	//   write the file's contents to the buffer.
+	if hdr.Typeflag == tar.TypeReg {
+		tb := ta.bufioWriter
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+
+		tb.Reset(tw)
+		defer tb.Reset(nil)
+		_, err = io.Copy(tb, file)
+		file.Close()
+		if err != nil {
+			return err
+		}
+		err = tb.Flush()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Append a "/" to a string if it doesn't have one already.
+func fmtDir(name *string) {
+	s := string(filepath.Separator)
+	if !strings.HasSuffix(*name, s) {
+		*name = concat(*name, s)
+	}
+}
+
+// https://github.com/docker/docker/blob/master/pkg/archive/archive_unix.go
+func tarSetHeader(hdr *tar.Header, stat interface{}) (nlink uint32, inode uint64, err error) {
+	s, ok := stat.(*syscall.Stat_t)
+
+	if !ok {
+		err = fmt.Errorf("func tarHeader: cannot convert stat value to syscall.Stat_t")
+		return
+	}
+
+	nlink = uint32(s.Nlink)
+	inode = uint64(s.Ino)
+
+	// Currently go does not fil in the major/minors
+	if s.Mode&syscall.S_IFBLK != 0 ||
+		s.Mode&syscall.S_IFCHR != 0 {
+		hdr.Devmajor = int64(major(uint64(s.Rdev)))
+		hdr.Devminor = int64(minor(uint64(s.Rdev)))
+	}
+
+	return
+}
+
+// Return a nil slice and nil error if the xattr is not set.
+func lgetxattr(path string, attr string) ([]byte, error) {
+	pathBytes, err := syscall.BytePtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+	attrBytes, err := syscall.BytePtrFromString(attr)
+	if err != nil {
+		return nil, err
+	}
+
+	dest := make([]byte, 128)
+	destBytes := unsafe.Pointer(&dest[0])
+	sz, _, errno := syscall.Syscall6(syscall.SYS_LGETXATTR, uintptr(unsafe.Pointer(pathBytes)), uintptr(unsafe.Pointer(attrBytes)), uintptr(destBytes), uintptr(len(dest)), 0, 0)
+	if errno == syscall.ENODATA {
+		return nil, nil
+	}
+	if errno == syscall.ERANGE {
+		dest = make([]byte, sz)
+		destBytes := unsafe.Pointer(&dest[0])
+		sz, _, errno = syscall.Syscall6(syscall.SYS_LGETXATTR, uintptr(unsafe.Pointer(pathBytes)), uintptr(unsafe.Pointer(attrBytes)), uintptr(destBytes), uintptr(len(dest)), 0, 0)
+	}
+	if errno != 0 {
+		return nil, errno
+	}
+
+	return dest[:sz], nil
+}
+
+func fileMode(fi os.FileInfo) string {
+	mode := string(fi.Mode().String()[0])
+	switch mode {
+	case "d":
+		return "dir"
+	case "L":
+		return "symlink"
+	}
+	if fi.Mode()&os.ModeDir != 0 {
+		return "dir"
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return "symlink"
+	}
+
+	return ""
+}
+
+func major(device uint64) uint64 {
+	return (device >> 8) & 0xfff
+}
+
+func minor(device uint64) uint64 {
+	return (device & 0xff) | ((device >> 12) & 0xfff00)
+}
+
+func copyFile(srcName string, dstName string) (err error) {
+	src, err := os.Open(srcName)
+	if err != nil {
+		return
+	}
+	defer src.Close()
+
+	dst, err := os.Create(dstName)
+	if err != nil {
+		return
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	if err == nil {
+		si, err := src.Stat()
+		if err != nil {
+			err = os.Chmod(dstName, si.Mode())
+		}
+
+	}
+	/*
+		if err != nil {
+			return
+		}
+		si, err := src.Stat()
+		if err != nil {
+			err = os.Chmod(dstName, si.Mode())
+		}
+	*/
+
+	return
+}
+
+func copyDir(srcName string, dstName string) (err error) {
+	// get properties of source dir
+	si, err := os.Stat(srcName)
+	if err != nil {
+		return err
+	}
+
+	// create dest dir
+	err = os.MkdirAll(dstName, si.Mode())
+	if err != nil {
+		return err
+	}
+
+	dir, _ := os.Open(srcName)
+
+	files, err := dir.Readdir(-1)
+
+	for _, fi := range files {
+		fiName := fi.Name()
+		srcPath := concat(srcName, "/", fiName)
+		dstPath := concat(dstName, "/", fiName)
+
+		switch fi.IsDir() {
+		case true:
+			// create sub-directories - recursively
+			err = copyDir(srcPath, dstPath)
+			if err != nil {
+				print(err)
+				//break
+			}
+		default:
+			// perform copy
+			err = copyFile(srcPath, dstPath)
+			if err != nil {
+				print(err)
+				//break
+			}
+		}
+
+	}
+	return
+}
+
+/*
+// Walk through a directory, adding each file to a tar archive.
+func tarDir(dirName string, tw *tar.Writer) (err error) {
+	dir, err := os.Open(dirName)
+	if err != nil {
+		return
+	}
+	defer dir.Close()
+
+	files, err := dir.Readdir(-1)
+	if err != nil {
+		return
+	}
+	//total := len(files)
+
+	for _, fi := range files {
+		if fi.IsDir() {
+			name := concat(dirName, "/", fi.Name())
+			err = tarDir(name, tw)
+			if err != nil {
+				break
+			}
+			continue
+		}
+
+		// See https://www.socketloop.com/tutorials/go-file-path-independent-of-operating-system
+		fileName := concat(dirName, string(filepath.Separator), fi.Name())
+		file, err := os.Open(fileName)
+		if err != nil {
+			break
+		}
+		defer file.Close()
+
+		// Prepare the tar header.
+		hdr := new(tar.Header)
+		hdr.Name = fileName
+		hdr.Size = fi.Size()
+		hdr.Mode = int64(fi.Mode())
+		hdr.ModTime = fi.ModTime()
+
+		err = tw.WriteHeader(hdr)
+		if err != nil {
+			break
+		}
+
+		_, err = io.Copy(tw, file)
+		if err != nil {
+			break
+		}
+
+		/*
+			// Print progress.
+			percent := int(float64(i) / float64(total) * 100)
+			printf("\r%s", strings.Repeat(" ", 70))
+			printf("\r  %v%%   %v/%v", percent, i, total)
+*/
+/*
+	}
+	//print()
+	return
+}
+*/
+
+/*
+// Walk through a directory, adding each file to a tar archive.
+func tarWrite(dirName string, tw *tar.Writer) (err error) {
+	dir, err := os.Open(dirName)
+	if err != nil {
+		return
+	}
+	defer dir.Close()
+
+	files, err := dir.Readdir(0)
+	if err != nil {
+		return
+	}
+	//total := len(files)
+
+	for _, fi := range files {
+		if fi.IsDir() {
+			name := concat(dirName, "/", fi.Name())
+			err = tarWrite(name, tw)
+			if err != nil {
+				break
+			}
+			continue
+		}
+
+		// See https://www.socketloop.com/tutorials/go-file-path-independent-of-operating-system
+		fileName := concat(dirName, string(filepath.Separator), fi.Name())
+		file, err := os.Open(fileName)
+		if err != nil {
+			break
+		}
+		defer file.Close()
+
+		// Prepare the tar header.
+		hdr := new(tar.Header)
+		hdr.Name = file.Name()
+		//hdr.Name = fileName
+		hdr.Size = fi.Size()
+		hdr.Mode = int64(fi.Mode())
+		hdr.ModTime = fi.ModTime()
+
+		err = tw.WriteHeader(hdr)
+		if err != nil {
+			break
+		}
+
+		_, err = io.Copy(tw, file)
+		if err != nil {
+			break
+		}
+
+		/*
+			// Print progress.
+			percent := int(float64(i) / float64(total) * 100)
+			printf("\r%s", strings.Repeat(" ", 70))
+			printf("\r  %v%%   %v/%v", percent, i, total)
+*/ /*
+	}
+	//print()
+	return
+}
+*/
+
+// Compress a file to a snappy archive.
+func snap(src *os.File) (dst *os.File, err error) {
+	// Create the destination file.
+	dstName := concat(src.Name(), ".sz")
+	dst, err = create(dstName, 0777)
+	if err != nil {
+		return
+	}
+
+	// Read the contents of the source file.
+	var srcContents []byte
+	srcContents, err = ioutil.ReadAll(src)
+	if err != nil {
+		return
+	}
+	srcLength := uint64(len(srcContents))
+
+	// Prepare to turn the destination file into a snappy file.
+	dstWriter := &PassThru{Writer: dst, length: srcLength}
+	szWriter := snappy.NewWriter(dstWriter)
+
+	// Write the source file's contents to the new snappy file.
+	print(dstName)
+	_, err = szWriter.Write(srcContents)
+	print()
+	if err != nil {
+		return
+	}
+
+	// Re-open the modified file.
+	dst, err = os.Open(dstName)
+	return
+}
+
+/*
+// Extract a tar archive.
+func untar(src *os.File) (err error) {
+	srcInfo, err := src.Stat()
+	if err != nil {
+		return
+	}
+	srcLength := uint64(srcInfo.Size())
+	srcName := srcInfo.Name()
+
+	sr := &PassThru{Reader: src, length: srcLength}
+	tr := tar.NewReader(sr)
+
+	dstName := strings.TrimSuffix(srcName, ".tar")
+	if dstName == srcName {
+		dstName = concat(srcName, "-uncompressed")
+	}
+	fmt.Println(dstName)
+	_, err = io.Copy(dst, tr)
+	fmt.Println()
+	return
+}
+*/
+
+// Extract a tar archive.
+func untar(file *os.File) (err error) {
+	fi, err := file.Stat()
+	if err != nil {
+		return
+	}
+	name := fi.Name()
+	total := int64(fi.Size())
+
+	tr := tar.NewReader(file)
+
+	print(name)
+	var progress int64
+	for {
+		var hdr *tar.Header
+		hdr, err = tr.Next()
+		if err == io.EOF {
+			// Break if the end of the tar archive has been reached.
+			err = nil
+			break
+		}
+		if err != nil {
+			break
+		}
+
+		switch hdr.Typeflag {
+
+		// Extract a directory.
+		case tar.TypeDir:
+			err = os.MkdirAll(hdr.Name, os.FileMode(hdr.Mode))
+			if err != nil {
+				break
+			}
+
+		// Extract a file.
+		case tar.TypeReg, tar.TypeRegA:
+			var w *os.File
+			w, err = os.OpenFile(hdr.Name, os.O_RDWR|os.O_CREATE|os.O_APPEND, os.FileMode(hdr.Mode))
+			if err != nil {
+				break
+			}
+			_, err = io.Copy(w, tr)
+			if err != nil {
+				break
+			}
+			w.Close()
+
+		// Extract a hard link.
+		case tar.TypeLink:
+			err = os.Link(hdr.Linkname, hdr.Name)
+			if err != nil {
+				break
+			}
+
+		// Extract a symlink.
+		case tar.TypeSymlink:
+			err = os.Symlink(hdr.Linkname, hdr.Name)
+			if err != nil {
+				break
+			}
+
+		// Continue loop without printing progress.
+		default:
+			// Print anything missed for debugging purposes.
+			printf("%v %v\n", hdr.Name, hdr.Typeflag)
+			continue
+		}
+
+		// Print progress.
+		if hdr.Size == int64(0) {
+			continue
+		}
+		progress = progress + hdr.Size
+		percent := progress / total * 100
+		printf("\r%s", strings.Repeat(" ", 70))
+		printf("\r  %v%%   %v / %v", percent, progress, total)
+	}
+	print()
+
+	if err != nil {
+		err = fmt.Errorf("%v\nFailed to extract %v", err)
+	}
+	return
+}
+
+// Decompress a snappy archive.
+func unsnap(src *os.File) (err error) {
+	srcInfo, err := src.Stat()
+	if err != nil {
+		return
+	}
+	srcLength := uint64(srcInfo.Size())
+	srcName := srcInfo.Name()
+
+	srcReader := &PassThru{Reader: src, length: srcLength}
+	szReader := snappy.NewReader(srcReader)
+
+	dstName := strings.TrimSuffix(srcName, ".sz")
+	if dstName == srcName {
+		dstName = concat(srcName, "-uncompressed")
+	}
+	dst, err := create(dstName, 0777)
+	if err != nil {
+		return
+	}
+
+	fmt.Println(srcName)
+	_, err = io.Copy(dst, szReader)
+	fmt.Println()
+
+	dst, err = os.Open(dstName)
+	if err != nil {
+		return
+	}
+	if isTar(dst) {
+		err = untar(dst)
+		return
+	}
+	return
+}
+
+// Credits to jimt from here:
+// https://stackoverflow.com/questions/22421375/how-to-print-the-bytes-while-the-file-is-being-downloaded-golang
+//
+// PassThru wraps an existing io.Reader or io.Writer.
+// It simply forwards the Read() or Write() call, while displaying
+// the results from individual calls to it.
+type PassThru struct {
+	io.Reader
+	io.Writer
+	total    uint64 // Total # of bytes transferred
+	length   uint64 // Expected length
+	progress float64
+}
+
+// Write 'overrides' the underlying io.Reader's Read method.
+// This is the one that will be called by io.Copy(). We simply
+// use it to keep track of byte counts and then forward the call.
+// NOTE: Print a new line after any commands which use this io.Reader.
+func (p *PassThru) Read(b []byte) (int, error) {
+	n, err := p.Reader.Read(b)
+	if n <= 0 {
+		return n, err
+	}
+
+	p.total += uint64(n)
+	percentage := float64(p.total) / float64(p.length) * float64(100)
+	percent := int(percentage)
+	if percentage-p.progress < 1 && percent != 100 {
+		return n, err
+	}
+
+	total := fmtSize(p.total)
+	goal := fmtSize(p.length)
+
+	fmt.Printf("\r%s", strings.Repeat(" ", 70))
+	fmt.Printf("\r  %v%%   %v / %v", percent, total, goal)
+
+	p.progress = percentage
+
+	return n, err
+}
+
+// Write 'overrides' the underlying io.Writer's Write method.
+// This is the one that will be called by io.Copy(). We simply
+// use it to keep track of byte counts and then forward the call.
+// NOTE: Print a new line after any commands which use this io.Writer.
+func (p *PassThru) Write(b []byte) (int, error) {
+	n, err := p.Writer.Write(b)
+	if n <= 0 {
+		return n, err
+	}
+
+	p.total += uint64(n)
+	percentage := float64(p.total) / float64(p.length) * float64(100)
+	percent := int(percentage)
+	if percentage-p.progress < 1 && percent != 100 {
+		return n, err
+	}
+
+	total := fmtSize(p.total)
+	goal := fmtSize(p.length)
+	ratio := fmt.Sprintf("%.3f", float64(p.total)/float64(p.length))
+
+	fmt.Printf("\r%s", strings.Repeat(" ", 70))
+	fmt.Printf("\r  %v%%   %v / %v = %v", percent, total, goal, ratio)
+
+	p.progress = percentage
+
+	return n, err
+}
+
+// Slight variation of bytefmt.ByteSize() from:
+// https://github.com/pivotal-golang/bytefmt/blob/master/bytes.go
+const (
+	BYTE     = 1.0
+	KIBIBYTE = 1000 * BYTE
+	MEBIBYTE = 1000 * KIBIBYTE
+	GIBIBYTE = 1000 * MEBIBYTE
+	TEBIBYTE = 1000 * GIBIBYTE
+)
+
+func fmtSize(bytes uint64) string {
+	unit := ""
+	value := float64(bytes)
+
+	switch {
+	case bytes >= TEBIBYTE:
+		unit = "TiB"
+		value = value / TEBIBYTE
+	case bytes >= GIBIBYTE:
+		unit = "GiB"
+		value = value / GIBIBYTE
+	case bytes >= MEBIBYTE:
+		unit = "MiB"
+		value = value / MEBIBYTE
+	case bytes >= KIBIBYTE:
+		unit = "KiB"
+		value = value / KIBIBYTE
+	case bytes >= BYTE:
+		unit = "Bytes"
+	case bytes == 0:
+		return "0"
+	}
+
+	stringValue := fmt.Sprintf("%.1f", value)
+	//return fmt.Sprintf("%s %s", stringValue, unit)
+	return concat(stringValue, " ", unit)
+}
+
+/*
+// Create a tar archive of a file.
+func tarchiveDir(dir *os.File) (dst *os.File, err error) {
+	dirName := dir.Name()
+	// Create the destination file.
+	dstName := concat(dirName, ".tar")
+	dst, err = create(dstName, 0777)
+	if err != nil {
+		return
+	}
+
+	/*
+		// Read the contents of the source file.
+		var srcContents []byte
+		srcContents, err = ioutil.ReadAll(dir)
+		if err != nil {
+			return
+		}
+		srcLength := uint64(len(srcContents))
+
+		// Prepare to turn the destination file into a tar archive.
+		dstWriter := &PassThru{Writer: dst, length: srcLength}
+		tw := tar.NewWriter(dstWriter)
+		defer tw.Close()
+
+		// Write the source file's contents to the new tar archive.
+		print(dstName)
+		_, err = tw.Write(srcContents)
+		print()
+		if err != nil {
+			return
+		}
+*/
+/*
+	var dstWriter io.WriteCloser = dst
+	tw := tar.NewWriter(dstWriter)
+	defer tw.Close()
+
+	print(dstName)
+
+	err = tarWrite(dirName, tw)
+	if err != nil {
+		return
+	}
+	//print()
+
+	// Re-open the modified file.
+	dst, err = os.Open(dstName)
+	return
+}
+/*
+
+/*
+// Slight variation of bytefmt.ByteSize() from:
+// https://github.com/pivotal-golang/bytefmt/blob/master/bytes.go
+const (
+	BYTE     = 1.0
+	KILOBYTE = 1024 * BYTE
+	MEGABYTE = 1024 * KILOBYTE
+	GIGABYTE = 1024 * MEGABYTE
+	TERABYTE = 1024 * GIGABYTE
+)
+
+func fmtSize(bytes uint64) string {
+	unit := ""
+	value := float64(bytes)
+
+	switch {
+	case bytes >= TERABYTE:
+		unit = "TB"
+		value = value / TERABYTE
+	case bytes >= GIGABYTE:
+		unit = "GB"
+		value = value / GIGABYTE
+	case bytes >= MEGABYTE:
+		unit = "MB"
+		value = value / MEGABYTE
+	case bytes >= KILOBYTE:
+		unit = "KB"
+		value = value / KILOBYTE
+	case bytes >= BYTE:
+		unit = "Bytes"
+	case bytes == 0:
+		return "0"
+	}
+
+	stringValue := fmt.Sprintf("%.1f", value)
+	//return fmt.Sprintf("%s %s", stringValue, unit)
+	return concat(stringValue, " ", unit)
+}
+*/
+
+/*
+func analyze(filename string) {
+	fi, err := os.Stat(dir); err != nil {
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	dir, err := isDir(file)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if dir {
+		TEST(filename, "is dir")
+		tar(file)
+		filename = concat(filename, ".tar")
+	}
+	TEST(filename, "is not dir")
+	return
+}
+
+// Return true if a file is a directory.
+//   Also return any errors encountered.
+func isDir(file *os.File) (bool, error) {
+	fi, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+	if mode := fi.Mode(); mode.IsDir() {
+		return true, nil
+	}
+	return false, nil
+}
+*/
+
+/*
+func (p *PassThruWriter) Write(b []byte) (int, error) {
+	n, err := p.Writer.Write(b)
+	if n > 0 {
+		p.total += int64(n)
+		percent := float64(p.total) / float64(p.length) * float64(100)
+		//i := int(percentage / float64(10))
+		i := int(percent)
+		if percent-p.progress > 2 {
+			fmt.Printf("\r-> %v/%v bytes          %v%%", p.total, p.length, i)
+			p.progress = percent
+		}
+	}
+	return n, err
+}
+*/
+
+/*
+func genLogFile() {
+	pattern := ConcatBy(Patterns, ",")
+	fileName := Concat("lss-results_", pattern)
+
+	RemoveIfExists(fileName)
+	LogFile = Create(fileName)
+
+	header := fmt.Sprintf(
+		"Search results for:\n    \"%v\"\nunder:\n    \"%v\"\n",
+		pattern,
+		Root,
+	)
+	Write(header, LogFile)
+}
+*/
