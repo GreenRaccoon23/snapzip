@@ -1,0 +1,80 @@
+!_TAG_FILE_FORMAT	2
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+!_TAG_PROGRAM_AUTHOR	Joel Stemmer	/stemmertech@gmail.com/
+!_TAG_PROGRAM_NAME	gotags
+!_TAG_PROGRAM_URL	https://github.com/jstemmer/gotags
+!_TAG_PROGRAM_VERSION	1.3.0
+BYTE	sz.go	360;"	c	access:public	line:360
+GIBIBYTE	sz.go	363;"	c	access:public	line:363
+KIBIBYTE	sz.go	361;"	c	access:public	line:361
+MEBIBYTE	sz.go	362;"	c	access:public	line:362
+Print	sz.go	338;"	m	access:public	ctype:passthru	line:338	signature:()
+Read	sz.go	313;"	m	access:public	ctype:passthru	line:313	signature:(b []byte)	type:int, error
+TEBIBYTE	sz.go	364;"	c	access:public	line:364
+Write	sz.go	327;"	m	access:public	ctype:passthru	line:327	signature:(b []byte)	type:int, error
+add	sz.go	818;"	m	access:private	ctype:tarAppender	line:818	signature:(path, name string)	type:error
+analyze	sz.go	182;"	f	access:private	line:182	signature:(filename string)	type:error
+archive/tar	sz.go	4;"	i	line:4
+buffer	sz.go	23;"	v	access:private	line:23	type:bytes.Buffer
+bufio	sz.go	5;"	i	line:5
+bufioWriter	sz.go	453;"	w	access:private	ctype:snapper	line:453	type:*bufio.Writer
+bufioWriter	sz.go	743;"	w	access:private	ctype:tarAppender	line:743	type:*bufio.Writer
+bytes	sz.go	6;"	i	line:6
+chkHelp	sz.go	36;"	f	access:private	line:36	signature:()
+concat	sz.go	161;"	f	access:private	line:161	signature:(slc )	type:string
+create	sz.go	395;"	f	access:private	line:395	signature:(filename string, mode os.FileMode)	type:*os.File, error
+devmajor	sz.go	938;"	f	access:private	line:938	signature:(device uint64)	type:uint64
+devminor	sz.go	944;"	f	access:private	line:944	signature:(device uint64)	type:uint64
+dirSize	sz.go	731;"	f	access:private	line:731	signature:(dir string)	type:int64, int
+doQuiet	sz.go	25;"	v	access:private	line:25	type:bool
+doSingleArchive	sz.go	24;"	v	access:private	line:24	type:bool
+dstArchive	sz.go	26;"	v	access:private	line:26	type:string
+exists	sz.go	444;"	f	access:private	line:444	signature:(filename string)	type:bool
+filter	sz.go	102;"	f	access:private	line:102	signature:(slc []string, args )	type:[]string
+flag	sz.go	7;"	i	line:7
+flags	sz.go	71;"	f	access:private	line:71	signature:()
+fmt	sz.go	8;"	i	line:8
+fmtDir	sz.go	723;"	f	access:private	line:723	signature:(name *string)
+fmtSize	sz.go	367;"	f	access:private	line:367	signature:(bytes uint64)	type:string
+genUnusedFilename	sz.go	406;"	f	access:private	line:406	signature:(filename *string)
+github.com/golang/snappy	sz.go	19;"	i	line:19
+hardLinks	sz.go	745;"	w	access:private	ctype:tarAppender	line:745	type:map[uint64]string
+help	sz.go	49;"	f	access:private	line:49	signature:(status int)
+init	sz.go	30;"	f	access:private	line:30	signature:()
+io	sz.go	9;"	i	line:9
+io.Reader	sz.go	302;"	e	access:public	ctype:passthru	line:302	type:io.Reader
+io.Writer	sz.go	303;"	e	access:public	ctype:passthru	line:303	type:io.Writer
+io/ioutil	sz.go	10;"	i	line:10
+isDir	sz.go	252;"	f	access:private	line:252	signature:(file *os.File)	type:bool
+isSz	sz.go	261;"	f	access:private	line:261	signature:(file *os.File)	type:bool
+isTar	sz.go	279;"	f	access:private	line:279	signature:(file *os.File)	type:bool
+length	sz.go	305;"	w	access:private	ctype:passthru	line:305	type:uint64
+lgetxattr	sz.go	952;"	f	access:private	line:952	signature:(path string, attr string)	type:[]byte, error
+main	sz.go	127;"	f	access:private	line:127	signature:()
+main	sz.go	1;"	p	line:1
+matchesOr	sz.go	171;"	f	access:private	line:171	signature:(s string, conditions )	type:bool
+mime	sz.go	11;"	i	line:11
+os	sz.go	12;"	i	line:12
+passthru	sz.go	301;"	t	access:private	line:301	type:struct
+path/filepath	sz.go	13;"	i	line:13
+print	sz.go	140;"	f	access:private	line:140	signature:(a )
+printf	sz.go	153;"	f	access:private	line:153	signature:(format string, a )
+progress	sz.go	306;"	w	access:private	ctype:passthru	line:306	type:float64
+slcHas	sz.go	116;"	f	access:private	line:116	signature:(slc []string, args )	type:bool
+snap	sz.go	460;"	f	access:private	line:460	signature:(src *os.File)	type:*os.File, error
+snapSafe	sz.go	521;"	f	access:private	line:521	signature:(src *os.File)	type:*os.File, error
+snapper	sz.go	451;"	t	access:private	line:451	type:struct
+snappyWriter	sz.go	452;"	w	access:private	ctype:snapper	line:452	type:*snappy.Writer
+splitExt	sz.go	423;"	f	access:private	line:423	signature:(filename string)	type:string, string
+strconv	sz.go	14;"	i	line:14
+strings	sz.go	15;"	i	line:15
+syscall	sz.go	16;"	i	line:16
+tarAppender	sz.go	741;"	t	access:private	line:741	type:struct
+tarDir	sz.go	750;"	f	access:private	line:750	signature:(dir *os.File)	type:*os.File, error
+tarSetHeader	sz.go	917;"	f	access:private	line:917	signature:(hdr *tar.Header, stat interface{})	type:uint32, uint64, error
+tarWriter	sz.go	742;"	w	access:private	ctype:tarAppender	line:742	type:*tar.Writer
+total	sz.go	304;"	w	access:private	ctype:passthru	line:304	type:uint64
+trgtFiles	sz.go	27;"	v	access:private	line:27	type:[]string
+unsafe	sz.go	17;"	i	line:17
+unsnap	sz.go	582;"	f	access:private	line:582	signature:(src *os.File)	type:*os.File, error
+untar	sz.go	630;"	f	access:private	line:630	signature:(file *os.File)	type:error
