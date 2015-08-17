@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/golang/snappy"
@@ -126,31 +127,38 @@ func slcHas(slc []string, args ...string) bool {
 
 func main() {
 	defer os.Exit(0)
-	//if doSingleArchive
+	/*
+		if doSingleArchive {
+
+		}
+	*/
 	for _, f := range trgtFiles {
 		f = filepath.Clean(f)
 		err := analyze(f)
 		if err == nil || doQuiet {
 			continue
 		}
-		fmt.Println(err)
+		print(err)
 	}
 }
 
-// Pass to fmt.Println().
+// Pass to fmt.Println() unless quiet mode is active.
 func print(a ...interface{}) {
 	if doQuiet {
 		return
 	}
-	switch len(a) {
-	case 0:
-		fmt.Println()
-	default:
-		fmt.Println(a...)
-	}
+	fmt.Println(a...)
 }
 
-// Pass to fmt.Printf().
+// Print a newline unless quiet mode is active.
+func println() {
+	if doQuiet {
+		return
+	}
+	fmt.Println()
+}
+
+// Pass to fmt.Printf() unless quiet mode is active.
 func printf(format string, a ...interface{}) {
 	if doQuiet {
 		return
@@ -202,6 +210,7 @@ func analyze(filename string) error {
 		if err = untar(uncompressed); err != nil {
 			return err
 		}
+		break
 
 	// If the file is a directory, tar it before compressing it.
 	// (Simultaneously compressing and tarring the file
@@ -234,6 +243,7 @@ func analyze(filename string) error {
 		if _, err = snapSafe(file); err != nil {
 			return err
 		}
+		break
 	}
 
 	return nil
@@ -281,6 +291,63 @@ func isTar(file *os.File) bool {
 		}
 	}
 	return true
+}
+
+// Create a file if it doesn't exist. Otherwise, just open it.
+func create(filename string, mode os.FileMode) (*os.File, error) {
+	genUnusedFilename(&filename)
+	file, err := os.OpenFile(
+		filename,
+		os.O_RDWR|os.O_CREATE|os.O_APPEND,
+		mode,
+	)
+	return file, err
+}
+
+// Modify a filename to one that has not been used by the system.
+func genUnusedFilename(filename *string) {
+	if !exists(*filename) {
+		return
+	}
+	base, ext := splitExt(*filename)
+	for i := 1; i < 20091110230000; i++ {
+		testname := concat(base, "(", strconv.Itoa(i), ")", ext)
+		if exists(testname) {
+			continue
+		}
+		*filename = testname
+		return
+	}
+}
+
+// Split the extension off a filename.
+// Return the basename and the extension.
+func splitExt(filename string) (base, ext string) {
+	base = filepath.Clean(filename)
+	for {
+		testext := filepath.Ext(base)
+		if testext == "" {
+			return
+		}
+		if mime.TypeByExtension(testext) == "" {
+			switch testext {
+			case ".tar", ".sz", ".tar.sz":
+				break
+			default:
+				return
+			}
+		}
+		ext = concat(testext, ext)
+		base = strings.TrimSuffix(base, testext)
+	}
+}
+
+// Check whether a file exists.
+func exists(filename string) bool {
+	if _, err := os.Stat(filename); err == nil {
+		return true
+	}
+	return false
 }
 
 // Credits to jimt from here:
@@ -382,193 +449,6 @@ func fmtSize(bytes uint64) string {
 	return concat(stringValue, " ", unit)
 }
 
-// Create a file if it doesn't exist. Otherwise, just open it.
-func create(filename string, mode os.FileMode) (*os.File, error) {
-	genUnusedFilename(&filename)
-	file, err := os.OpenFile(
-		filename,
-		os.O_RDWR|os.O_CREATE|os.O_APPEND,
-		mode,
-	)
-	return file, err
-}
-
-// Modify a filename to one that has not been used by the system.
-func genUnusedFilename(filename *string) {
-	if !exists(*filename) {
-		return
-	}
-	base, ext := splitExt(*filename)
-	for i := 1; i < 20091110230000; i++ {
-		testname := concat(base, "(", strconv.Itoa(i), ")", ext)
-		if exists(testname) {
-			continue
-		}
-		*filename = testname
-		return
-	}
-}
-
-// Split the extension off a filename.
-// Return the basename and the extension.
-func splitExt(filename string) (base, ext string) {
-	base = filepath.Clean(filename)
-	for {
-		testext := filepath.Ext(base)
-		if testext == "" {
-			return
-		}
-		if mime.TypeByExtension(testext) == "" {
-			switch testext {
-			case ".tar", ".sz", ".tar.sz":
-				break
-			default:
-				return
-			}
-		}
-		ext = concat(testext, ext)
-		base = strings.TrimSuffix(base, testext)
-	}
-}
-
-// Check whether a file exists.
-func exists(filename string) bool {
-	if _, err := os.Stat(filename); err == nil {
-		return true
-	}
-	return false
-}
-
-type snapper struct {
-	snappyWriter *snappy.Writer
-	bufioWriter  *bufio.Writer
-}
-
-// Compress a file to a snappy archive.
-// If the source file is too large for the system to handle,
-//   the snapSafe() function runs instead.
-// Compared to snap(), the compression ratio for this function is lower.
-func snap(src *os.File) (dst *os.File, err error) {
-	srcInfo, err := src.Stat()
-	if err != nil {
-		return
-	}
-
-	// Make sure existing files are not overwritten.
-	dstName := concat(src.Name(), ".sz")
-	genUnusedFilename(&dstName)
-
-	// Create the destination file.
-	if !doQuiet {
-		fmt.Println(dstName)
-	}
-	dst, err = create(dstName, srcInfo.Mode())
-	if err != nil {
-		return
-	}
-
-	// If this function encounters an error,
-	//   run the snapSafe() function instead.
-	// Otherwise, re-open the new, compressed file.
-	defer func() {
-		switch err {
-		case nil:
-			dst, err = os.Open(dstName)
-		default:
-			dst, err = snapSafe(src)
-		}
-	}()
-
-	// Read the contents of the source file.
-	srcContents, err := ioutil.ReadAll(src)
-	if err != nil {
-		return
-	}
-
-	// Prepare to turn the destination file into a snappy file.
-	pt := &passthru{
-		Writer: dst,
-		length: uint64(srcInfo.Size()),
-	}
-	defer func() { pt.Writer = nil }()
-	szWriter := snappy.NewWriter(pt)
-	defer szWriter.Reset(nil)
-
-	// Write the source file's contents to the new snappy file.
-	if !doQuiet {
-		defer fmt.Println()
-	}
-	_, err = szWriter.Write(srcContents)
-	if err != nil {
-		return
-	}
-	return
-}
-
-// Compress a file to a snappy archive.
-// This function runs if the source file is too large
-//   for the snap() function above.
-// Compared to snap(), the compression ratio for this function is lower.
-func snapSafe(src *os.File) (dst *os.File, err error) {
-	srcInfo, err := src.Stat()
-	if err != nil {
-		return
-	}
-
-	// Make sure existing files are not overwritten.
-	dstName := concat(src.Name(), ".sz")
-	genUnusedFilename(&dstName)
-	if !doQuiet {
-		fmt.Println(dstName)
-	}
-
-	// Create the destination file.
-	dst, err = create(dstName, srcInfo.Mode())
-	if err != nil {
-		return
-	}
-
-	// Remember to re-open the compressed file  after it has been written.
-	defer func() {
-		if err == nil {
-			dst, err = os.Open(dstName)
-		}
-	}()
-
-	// Set up a *passthru writer in order to print progress.
-	pt := &passthru{
-		Writer: dst,
-		length: uint64(srcInfo.Size()),
-	}
-	defer func() { pt.Writer = nil }()
-
-	// Set up a snappy writer.
-	sz := &snapper{
-		snappyWriter: snappy.NewWriter(pt),
-		bufioWriter:  bufio.NewWriter(nil),
-	}
-	szb := sz.bufioWriter
-	szw := sz.snappyWriter
-	defer szw.Reset(nil)
-
-	// Write the source file's contents to the new snappy file.
-	if !doQuiet {
-		defer fmt.Println()
-	}
-	szb.Reset(szw)
-	defer szb.Reset(nil)
-	_, err = io.Copy(szb, src)
-	src.Close()
-	if err != nil {
-		return
-	}
-	err = szb.Flush()
-	if err != nil {
-		return
-	}
-	return
-}
-
 // Decompress a snappy archive.
 func unsnap(src *os.File) (dst *os.File, err error) {
 	srcInfo, err := src.Stat()
@@ -579,13 +459,8 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := strings.TrimSuffix(srcName, ".sz")
-	if dstName == srcName {
-		dstName = concat(srcName, "-uncompressed")
-	}
 	genUnusedFilename(&dstName)
-	if !doQuiet {
-		fmt.Println(srcName)
-	}
+	print(srcName)
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
@@ -604,13 +479,11 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 		length: uint64(srcInfo.Size()),
 	}
 	defer func() { pt.Reader = nil }()
-	szReader := snappy.NewReader(pt)
-	defer szReader.Reset(nil)
+	szr := snappy.NewReader(pt)
+	defer szr.Reset(nil)
 
-	if !doQuiet {
-		defer fmt.Println()
-	}
-	_, err = io.Copy(dst, szReader)
+	defer println()
+	_, err = io.Copy(dst, szr)
 	if err != nil {
 		return
 	}
@@ -623,6 +496,7 @@ func untar(file *os.File) error {
 	if err != nil {
 		return err
 	}
+
 	total := uint64(fi.Size())
 	name := fi.Name()
 
@@ -633,11 +507,10 @@ func untar(file *os.File) error {
 
 	tr := tar.NewReader(file)
 
-	if !doQuiet {
-		fmt.Println(name)
-		defer fmt.Println()
-	}
+	print(name)
+	defer println()
 	var progress uint64
+	var start time.Time
 	for {
 		var hdr *tar.Header
 		hdr, err = tr.Next()
@@ -697,11 +570,15 @@ func untar(file *os.File) error {
 		}
 		progress = progress + uint64(hdr.Size)
 		percent := int(float64(progress) / float64(total) * float64(100))
-		fmt.Printf(
-			"\r%v\r  %v%%   %v / %v files",
-			strings.Repeat(" ", 70),
-			percent, fmtSize(progress), fmtSize(total),
+		if int(time.Since(start)) < 100000 && percent < 100 {
+			return nil
+		}
+		start = time.Now()
+		output := fmt.Sprintf(
+			"  %v%%   %v / %v files",
+			percent, progress, total,
 		)
+		fmt.Printf("\r%v", output)
 	}
 
 	if err != nil {
@@ -725,6 +602,128 @@ func dirSize(dir string) (b int64, i int) {
 		i += 1
 		return nil
 	})
+	return
+}
+
+type snapper struct {
+	snappyWriter *snappy.Writer
+	bufioWriter  *bufio.Writer
+}
+
+// Compress a file to a snappy archive.
+// If the source file is too large for the system to handle,
+//   the snapSafe() function runs instead.
+// Compared to snap(), the compression ratio for this function is lower.
+func snap(src *os.File) (dst *os.File, err error) {
+	srcInfo, err := src.Stat()
+	if err != nil {
+		return
+	}
+
+	// Make sure existing files are not overwritten.
+	dstName := concat(src.Name(), ".sz")
+	genUnusedFilename(&dstName)
+
+	// Create the destination file.
+	print(dstName)
+	dst, err = create(dstName, srcInfo.Mode())
+	if err != nil {
+		return
+	}
+
+	// If this function encounters an error,
+	//   run the snapSafe() function instead.
+	// Otherwise, re-open the new, compressed file.
+	defer func() {
+		switch err {
+		case nil:
+			dst, err = os.Open(dstName)
+		default:
+			dst, err = snapSafe(src)
+		}
+	}()
+
+	// Read the contents of the source file.
+	srcContents, err := ioutil.ReadAll(src)
+	if err != nil {
+		return
+	}
+
+	// Prepare to turn the destination file into a snappy file.
+	pt := &passthru{
+		Writer: dst,
+		length: uint64(srcInfo.Size()),
+	}
+	defer func() { pt.Writer = nil }()
+	szw := snappy.NewWriter(pt)
+	defer szw.Reset(nil)
+
+	// Write the source file's contents to the new snappy file.
+	defer println()
+	_, err = szw.Write(srcContents)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// Compress a file to a snappy archive.
+// This function runs if the source file is too large
+//   for the snap() function above.
+// Compared to snap(), the compression ratio for this function is lower.
+func snapSafe(src *os.File) (dst *os.File, err error) {
+	srcInfo, err := src.Stat()
+	if err != nil {
+		return
+	}
+
+	// Make sure existing files are not overwritten.
+	dstName := concat(src.Name(), ".sz")
+	genUnusedFilename(&dstName)
+	print(dstName)
+
+	// Create the destination file.
+	dst, err = create(dstName, srcInfo.Mode())
+	if err != nil {
+		return
+	}
+
+	// Remember to re-open the compressed file  after it has been written.
+	defer func() {
+		if err == nil {
+			dst, err = os.Open(dstName)
+		}
+	}()
+
+	// Set up a *passthru writer in order to print progress.
+	pt := &passthru{
+		Writer: dst,
+		length: uint64(srcInfo.Size()),
+	}
+	defer func() { pt.Writer = nil }()
+
+	// Set up a snappy writer.
+	sz := &snapper{
+		snappyWriter: snappy.NewWriter(pt),
+		bufioWriter:  bufio.NewWriter(nil),
+	}
+	szb := sz.bufioWriter
+	szw := sz.snappyWriter
+	defer szw.Reset(nil)
+
+	// Write the source file's contents to the new snappy file.
+	defer println()
+	szb.Reset(szw)
+	defer szb.Reset(nil)
+	_, err = io.Copy(szb, src)
+	src.Close()
+	if err != nil {
+		return
+	}
+	err = szb.Flush()
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -773,6 +772,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
 	var total, progress int
+	var start time.Time
 	if !doQuiet {
 		_, total = dirSize(dirName)
 		fmt.Println(dstName)
@@ -793,11 +793,15 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 		}
 		progress += 1
 		percent := int(float64(progress) / float64(total) * float64(100))
-		fmt.Printf(
-			"\r%v\r  %v%%   %v / %v files",
-			strings.Repeat(" ", 50),
+		if int(time.Since(start)) < 100000 && percent < 100 {
+			return nil
+		}
+		start = time.Now()
+		output := fmt.Sprintf(
+			"  %v%%   %v / %v files",
 			percent, progress, total,
 		)
+		fmt.Printf("\r%v", output)
 		return nil
 	})
 
