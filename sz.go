@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"mime"
 	"os"
 	"path/filepath"
@@ -133,7 +134,7 @@ func main() {
 		}
 	*/
 	for _, f := range trgtFiles {
-		f = filepath.Clean(f)
+		//f = filepath.Clean(f)
 		err := analyze(f)
 		if err == nil || doQuiet {
 			continue
@@ -165,6 +166,15 @@ func printf(format string, a ...interface{}) {
 	}
 	fmt.Printf(format, a...)
 }
+func chkerr(err error) {
+	if err == nil {
+		return
+	}
+	if doQuiet {
+		os.Exit(1)
+	}
+	log.Fatal(err)
+}
 
 // Concatenate strings.
 func concat(slc ...string) (concatenated string) {
@@ -180,12 +190,8 @@ func concat(slc ...string) (concatenated string) {
 //   added to a tar archive and then compressed.
 func analyze(filename string) error {
 	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer func(f *os.File) {
-		f.Close()
-	}(file)
+	chkerr(err)
+	defer func(f *os.File) { f.Close() }(file)
 
 	switch {
 
@@ -193,13 +199,11 @@ func analyze(filename string) error {
 	case isSz(file):
 		// Uncompress it.
 		uncompressed, err := unsnap(file)
-		if err != nil {
-			return err
-		}
+		chkerr(err)
 
 		// If the uncompressed file is a tar archive, untar it.
 		if !isTar(uncompressed) {
-			break
+			return nil
 		}
 		// Remember to remove the uncompressed tar archive.
 		defer func() {
@@ -207,10 +211,9 @@ func analyze(filename string) error {
 				os.Remove(uncompressed.Name())
 			}
 		}()
-		if err = untar(uncompressed); err != nil {
-			return err
-		}
-		break
+		err = untar(uncompressed)
+		chkerr(err)
+		return nil
 
 	// If the file is a directory, tar it before compressing it.
 	// (Simultaneously compressing and tarring the file
@@ -218,9 +221,7 @@ func analyze(filename string) error {
 	case isDir(file):
 		// Tar it.
 		file, err = tarDir(file)
-		if err != nil {
-			return err
-		}
+		chkerr(err)
 		// Remove to close and remove the temporary tar archive.
 		defer func() {
 			file.Close()
@@ -240,9 +241,8 @@ func analyze(filename string) error {
 
 		// If snap() failed, try the safer function snapSafe().
 		os.Remove(sz.Name())
-		if _, err = snapSafe(file); err != nil {
-			return err
-		}
+		_, err = snapSafe(file)
+		chkerr(err)
 		break
 	}
 
@@ -374,7 +374,23 @@ func (pt *passthru) Read(b []byte) (int, error) {
 		return n, err
 	}
 	pt.total += uint64(n)
-	pt.Print()
+
+	percentage := float64(pt.total) / float64(pt.length) * float64(100)
+	percent := int(percentage)
+	if percentage-pt.progress < 1 && percent < 99 {
+		return n, err
+	}
+
+	total := fmtSize(pt.total)
+	goal := fmtSize(pt.length)
+
+	fmt.Printf(
+		"\r%v\r  %v%%   %v / %v",
+		strings.Repeat(" ", 70),
+		percent, total, goal)
+
+	pt.progress = percentage
+
 	return n, err
 }
 
@@ -387,17 +403,12 @@ func (pt *passthru) Write(b []byte) (int, error) {
 	if n <= 0 || doQuiet {
 		return n, err
 	}
-	pt.total += uint64(n)
-	pt.Print()
-	return n, err
-}
 
-// Print progress.
-func (pt *passthru) Print() {
+	pt.total += uint64(n)
 	percentage := float64(pt.total) / float64(pt.length) * float64(100)
 	percent := int(percentage)
 	if percentage-pt.progress < 1 && percent < 99 {
-		return
+		return n, err
 	}
 
 	total := fmtSize(pt.total)
@@ -410,6 +421,8 @@ func (pt *passthru) Print() {
 		percent, total, goal, ratio)
 
 	pt.progress = percentage
+
+	return n, err
 }
 
 // Slight variation of bytefmt.ByteSize() from:
@@ -452,9 +465,7 @@ func fmtSize(bytes uint64) string {
 // Decompress a snappy archive.
 func unsnap(src *os.File) (dst *os.File, err error) {
 	srcInfo, err := src.Stat()
-	if err != nil {
-		return
-	}
+	chkerr(err)
 	srcName := srcInfo.Name()
 
 	// Make sure existing files are not overwritten.
@@ -464,9 +475,7 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
-	if err != nil {
-		return
-	}
+	chkerr(err)
 	// Remember to re-open the uncompressed file after it has been written.
 	defer func() {
 		if err == nil {
@@ -484,30 +493,55 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	defer println()
 	_, err = io.Copy(dst, szr)
-	if err != nil {
-		return
-	}
+	chkerr(err)
 	return
 }
 
 // Extract a tar archive.
 func untar(file *os.File) error {
 	fi, err := file.Stat()
-	if err != nil {
-		return err
-	}
+	chkerr(err)
 
 	total := uint64(fi.Size())
 	name := fi.Name()
 
-	// Make sure existing files are not overwritten.
-	originName := strings.TrimSuffix(name, ".tar")
-	dstName := originName
-	genUnusedFilename(&dstName)
-
 	tr := tar.NewReader(file)
 
-	print(name)
+	// Get the smallest directory name (top directory).
+	var topDir string
+	for {
+		var hdr *tar.Header
+		hdr, err = tr.Next()
+		// Break if the end of the tar archive has been reached.
+		if err == io.EOF {
+			err = nil
+			break
+		}
+		if hdr.Typeflag != tar.TypeDir {
+			continue
+		}
+		if topDir == "" {
+			topDir = hdr.Name
+		}
+		if len(hdr.Name) < len(topDir) {
+			topDir = hdr.Name
+		}
+	}
+	topDir = topDir[0 : len(topDir)-1]
+
+	// Make sure existing files are not overwritten.
+	dstName := topDir
+	genUnusedFilename(&dstName)
+
+	// Re-open the readers.
+	tr = tar.NewReader(nil)
+	file.Close()
+	file, err = os.Open(file.Name())
+	chkerr(err)
+	tr = tar.NewReader(file)
+
+	// Extract the archive.
+	print(dstName)
 	defer println()
 	var progress uint64
 	var start time.Time
@@ -518,46 +552,38 @@ func untar(file *os.File) error {
 		if err == io.EOF {
 			err = nil
 			break
-		} else if err != nil {
-			break
 		}
+		chkerr(err)
 
 		// Make sure existing files are not overwritten.
 		name := hdr.Name
-		if dstName != originName {
-			name = strings.Replace(name, originName, dstName, 1)
-		}
+		name = strings.Replace(name, topDir, dstName, 1)
+		genUnusedFilename(&name)
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
 			// Extract a directory.
-			if err = os.MkdirAll(name, os.FileMode(hdr.Mode)); err != nil {
-				break
-			}
+			err = os.MkdirAll(name, os.FileMode(hdr.Mode))
+			chkerr(err)
 
 		case tar.TypeReg, tar.TypeRegA:
 			// Extract a regular file.
 			var w *os.File
 			w, err = create(name, os.FileMode(hdr.Mode))
-			if err != nil {
-				break
-			}
-			if _, err = io.Copy(w, tr); err != nil {
-				break
-			}
+			chkerr(err)
+			_, err = io.Copy(w, tr)
+			chkerr(err)
 			w.Close()
 
 		case tar.TypeLink:
 			// Extract a hard link.
-			if err = os.Link(hdr.Linkname, name); err != nil {
-				break
-			}
+			err = os.Link(hdr.Linkname, name)
+			chkerr(err)
 
 		case tar.TypeSymlink:
 			// Extract a symlink.
-			if err = os.Symlink(hdr.Linkname, name); err != nil {
-				break
-			}
+			err = os.Symlink(hdr.Linkname, name)
+			chkerr(err)
 
 		default:
 			// Continue loop without printing progress.
@@ -570,13 +596,13 @@ func untar(file *os.File) error {
 		}
 		progress = progress + uint64(hdr.Size)
 		percent := int(float64(progress) / float64(total) * float64(100))
-		if int(time.Since(start)) < 100000 && percent < 100 {
-			return nil
+		if int(time.Since(start)) < 100000 && percent < 95 {
+			continue
 		}
 		start = time.Now()
 		output := fmt.Sprintf(
-			"  %v%%   %v / %v files",
-			percent, progress, total,
+			"  %v%%   %v / %v          ",
+			percent, fmtSize(progress), fmtSize(total),
 		)
 		fmt.Printf("\r%v", output)
 	}
@@ -589,6 +615,9 @@ func untar(file *os.File) error {
 
 // Append a "/" to a string if it doesn't have one already.
 func fmtDir(name *string) {
+	if *name == "." || *name == "" {
+		return
+	}
 	s := string(filepath.Separator)
 	if !strings.HasSuffix(*name, s) {
 		*name = concat(*name, s)
@@ -616,9 +645,7 @@ type snapper struct {
 // Compared to snap(), the compression ratio for this function is lower.
 func snap(src *os.File) (dst *os.File, err error) {
 	srcInfo, err := src.Stat()
-	if err != nil {
-		return
-	}
+	chkerr(err)
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(src.Name(), ".sz")
@@ -627,9 +654,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 	// Create the destination file.
 	print(dstName)
 	dst, err = create(dstName, srcInfo.Mode())
-	if err != nil {
-		return
-	}
+	chkerr(err)
 
 	// If this function encounters an error,
 	//   run the snapSafe() function instead.
@@ -639,15 +664,14 @@ func snap(src *os.File) (dst *os.File, err error) {
 		case nil:
 			dst, err = os.Open(dstName)
 		default:
+			os.Remove(dst.Name())
 			dst, err = snapSafe(src)
 		}
 	}()
 
 	// Read the contents of the source file.
 	srcContents, err := ioutil.ReadAll(src)
-	if err != nil {
-		return
-	}
+	chkerr(err)
 
 	// Prepare to turn the destination file into a snappy file.
 	pt := &passthru{
@@ -661,9 +685,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 	// Write the source file's contents to the new snappy file.
 	defer println()
 	_, err = szw.Write(srcContents)
-	if err != nil {
-		return
-	}
+	chkerr(err)
 	return
 }
 
@@ -673,9 +695,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 // Compared to snap(), the compression ratio for this function is lower.
 func snapSafe(src *os.File) (dst *os.File, err error) {
 	srcInfo, err := src.Stat()
-	if err != nil {
-		return
-	}
+	chkerr(err)
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(src.Name(), ".sz")
@@ -684,9 +704,7 @@ func snapSafe(src *os.File) (dst *os.File, err error) {
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
-	if err != nil {
-		return
-	}
+	chkerr(err)
 
 	// Remember to re-open the compressed file  after it has been written.
 	defer func() {
@@ -717,13 +735,9 @@ func snapSafe(src *os.File) (dst *os.File, err error) {
 	defer szb.Reset(nil)
 	_, err = io.Copy(szb, src)
 	src.Close()
-	if err != nil {
-		return
-	}
+	chkerr(err)
 	err = szb.Flush()
-	if err != nil {
-		return
-	}
+	chkerr(err)
 	return
 }
 
@@ -738,25 +752,61 @@ type tarAppender struct {
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Create a tar archive of a file.
 func tarDir(dir *os.File) (dst *os.File, err error) {
-	dirInfo, err := dir.Stat()
-	if err != nil {
-		return
-	}
-	// Create the destination file.
+	// Change to the parent directory of 'dir' in order to prevent
+	//   the addition of unnecessary parent directories in the tar archive.
 	dirName := dir.Name()
+	rootDir, err := os.Getwd()
+	chkerr(err)
+	fmtDir(&rootDir)
+	parentDir := filepath.Dir(dirName)
+	fmtDir(&parentDir)
+	err = os.Chdir(parentDir)
+	chkerr(err)
+
+	// Remember to 'popd' and to move the tar archive to the
+	//  top/root working directory.
+	defer func(origName string) {
+		if err != nil {
+			return
+		}
+
+		// Do not move the tar archive
+		//   if the working directory was not changed earlier.
+		if rootDir == "." {
+			// Re-open the tar archive.
+			dst, err = os.Open(dst.Name())
+			return
+		}
+
+		// Change back to the top working directory.
+		err = os.Chdir(rootDir)
+		chkerr(err)
+		// Move the tar archive to the top working directory.
+		oldName := concat(parentDir, dst.Name())
+		newName := concat(filepath.Base(origName), ".tar")
+		genUnusedFilename(&newName)
+		err = os.Rename(oldName, newName)
+		chkerr(err)
+		// Re-open the tar archive.
+		dst, err = os.Open(newName)
+	}(dirName)
+
+	// Re-open the source directory.
+	dir, err = os.Open(filepath.Base(dirName))
+	chkerr(err)
+
+	// Get file info for the source directory.
+	dirInfo, err := dir.Stat()
+	chkerr(err)
+	dirName = dir.Name()
+
+	// Create the destination file.
 	dstName := concat(dirName, ".tar")
 	genUnusedFilename(&dstName)
 	dst, err = create(dstName, dirInfo.Mode())
-	if err != nil {
-		return
-	}
-	// Remember to re-open the tar archive after it has been written.
-	defer func() {
-		if err == nil {
-			dst, err = os.Open(dstName)
-		}
-	}()
+	chkerr(err)
 
+	// Pipe the destination file through a *tarAppender.
 	var dstWriter io.WriteCloser = dst
 	ta := &tarAppender{
 		tarWriter:   tar.NewWriter(dstWriter),
@@ -767,6 +817,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	// Remember to close the tarWriter.
 	defer func() {
 		err = ta.tarWriter.Close()
+		chkerr(err)
 	}()
 
 	// Walk through the directory.
@@ -779,14 +830,10 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 		defer fmt.Println()
 	}
 	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+		chkerr(err)
 
 		err = ta.add(path, path)
-		if err != nil {
-			return err
-		}
+		chkerr(err)
 
 		if doQuiet {
 			return nil
