@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"mime"
 	"os"
@@ -22,7 +21,7 @@ import (
 )
 
 var (
-	buffer          bytes.Buffer
+	doBring         bool
 	doSingleArchive bool
 	doQuiet         bool
 	dstArchive      string
@@ -52,7 +51,7 @@ func help(status int) {
 	defer os.Exit(status)
 	fmt.Printf(
 		//"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
-		"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
+		"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
 		"sz",
 		"Usage: sz [option ...] [file ...]",
 		"Description:",
@@ -60,6 +59,8 @@ func help(status int) {
 		"Options:",
 		//"   -a <name>    Compress all files into a single snappy archive.",
 		//"                (default is to compress each file individually)",
+		"   -b           Bring compressed files to the present working",
+		"                  directory.",
 		"   -q           Do not show any output",
 		"Notes:",
 		"    This program automatically determines whether a file should be",
@@ -79,6 +80,7 @@ func flags() {
 
 	// Parse commandline arguments.
 	flag.StringVar(&dstArchive, "a", "", "")
+	flag.BoolVar(&doBring, "b", false, "")
 	flag.BoolVar(&doQuiet, "q", false, "")
 	flag.Parse()
 
@@ -89,7 +91,7 @@ func flags() {
 	}
 
 	if doQuiet {
-		bools := []string{"-s", "-q"}
+		bools := []string{"-b", "-q"}
 		trgtFiles = filter(trgtFiles, bools...)
 	}
 	if dstArchive != "" {
@@ -177,13 +179,13 @@ func chkerr(err error) {
 }
 
 // Concatenate strings.
-func concat(slc ...string) (concatenated string) {
-	defer buffer.Reset()
+func concat(slc ...string) string {
+	b := bytes.NewBuffer(nil)
+	defer b.Reset()
 	for _, s := range slc {
-		buffer.WriteString(s)
+		b.WriteString(s)
 	}
-	concatenated = buffer.String()
-	return
+	return b.String()
 }
 
 // Determine whether a file should be compressed, uncompressed, or
@@ -207,9 +209,7 @@ func analyze(filename string) error {
 		}
 		// Remember to remove the uncompressed tar archive.
 		defer func() {
-			if err == nil {
-				os.Remove(uncompressed.Name())
-			}
+			os.Remove(uncompressed.Name())
 		}()
 		err = untar(uncompressed)
 		chkerr(err)
@@ -220,7 +220,11 @@ func analyze(filename string) error {
 	//   results in a much lower compression ratio.)
 	case isDir(file):
 		// Tar it.
-		file, err = tarDir(file)
+		if doBring {
+			file, err = tarDirBring(file)
+		} else {
+			file, err = tarDir(file)
+		}
 		chkerr(err)
 		// Remove to close and remove the temporary tar archive.
 		defer func() {
@@ -234,14 +238,7 @@ func analyze(filename string) error {
 	// If the file is any other type, compress it.
 	default:
 		// Compress it.
-		sz, err := snap(file)
-		if err == nil {
-			break
-		}
-
-		// If snap() failed, try the safer function snapSafe().
-		os.Remove(sz.Name())
-		_, err = snapSafe(file)
+		_, err := snap(file)
 		chkerr(err)
 		break
 	}
@@ -359,9 +356,10 @@ func exists(filename string) bool {
 type passthru struct {
 	io.Reader
 	io.Writer
-	total    uint64 // Total # of bytes transferred
-	length   uint64 // Expected length
-	progress float64
+	total        uint64 // Total # of bytes transferred
+	length       uint64 // Expected length
+	progress     float64
+	outputLength int
 }
 
 // Write 'overrides' the underlying io.Reader's Read method.
@@ -384,11 +382,17 @@ func (pt *passthru) Read(b []byte) (int, error) {
 	total := fmtSize(pt.total)
 	goal := fmtSize(pt.length)
 
-	fmt.Printf(
-		"\r%v\r  %v%%   %v / %v",
-		strings.Repeat(" ", 70),
-		percent, total, goal)
+	output := fmt.Sprintf(
+		"  %v%%   %v / %v",
+		percent, total, goal,
+	)
+	outputLength := len(output)
+	if outputLength > pt.outputLength {
+		pt.outputLength = outputLength
+	}
 
+	fmt.Printf("\r%v", strings.Repeat(" ", pt.outputLength))
+	fmt.Printf("\r%v", output)
 	pt.progress = percentage
 
 	return n, err
@@ -415,11 +419,17 @@ func (pt *passthru) Write(b []byte) (int, error) {
 	goal := fmtSize(pt.length)
 	ratio := fmt.Sprintf("%.3f", float64(pt.total)/float64(pt.length))
 
-	fmt.Printf(
-		"\r%v\r  %v%%   %v / %v = %v",
-		strings.Repeat(" ", 70),
-		percent, total, goal, ratio)
+	output := fmt.Sprintf(
+		"  %v%%   %v / %v = %v",
+		percent, total, goal, ratio,
+	)
 
+	outputLength := len(output)
+	if outputLength > pt.outputLength {
+		pt.outputLength = outputLength
+	}
+	fmt.Printf("\r%v", strings.Repeat(" ", pt.outputLength))
+	fmt.Printf("\r%v", output)
 	pt.progress = percentage
 
 	return n, err
@@ -499,12 +509,13 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 // Extract a tar archive.
 func untar(file *os.File) error {
+	// Get file info.
 	fi, err := file.Stat()
 	chkerr(err)
-
 	total := uint64(fi.Size())
 	name := fi.Name()
 
+	// Wrap a *tar.Reader around the *os.File.
 	tr := tar.NewReader(file)
 
 	// Get the smallest directory name (top directory).
@@ -517,16 +528,25 @@ func untar(file *os.File) error {
 			err = nil
 			break
 		}
-		if hdr.Typeflag != tar.TypeDir {
-			continue
-		}
+		// Set topDir to the very first header name.
+		// Most likely, this will be the name of the top directory anyway.
 		if topDir == "" {
 			topDir = hdr.Name
 		}
+		if hdr.Typeflag != tar.TypeDir {
+			continue
+		}
+		// The top directory is the shortest path and has the shortest name.
 		if len(hdr.Name) < len(topDir) {
 			topDir = hdr.Name
 		}
 	}
+	// If no names were found, the data is corrupt.
+	if topDir == "" {
+		err = fmt.Errorf("Unable to read %v. Data is corrupt.", name)
+		return err
+	}
+	// Strip off the trailing '/'.
 	topDir = topDir[0 : len(topDir)-1]
 
 	// Make sure existing files are not overwritten.
@@ -544,6 +564,7 @@ func untar(file *os.File) error {
 	print(dstName)
 	defer println()
 	var progress uint64
+	var outputLength int
 	var start time.Time
 	for {
 		var hdr *tar.Header
@@ -586,7 +607,8 @@ func untar(file *os.File) error {
 			chkerr(err)
 
 		default:
-			// Continue loop without printing progress.
+			// If the Typeflag is missing, the data is probably corrupt.
+			// Just skip to the next one anyway if this happens.
 			continue
 		}
 
@@ -596,14 +618,24 @@ func untar(file *os.File) error {
 		}
 		progress = progress + uint64(hdr.Size)
 		percent := int(float64(progress) / float64(total) * float64(100))
-		if int(time.Since(start)) < 100000 && percent < 95 {
+
+		// Make sure progress isn't outputted more quickly
+		//   than the console can print.
+		if int(time.Since(start)) < 100000 && percent < 99 {
 			continue
 		}
 		start = time.Now()
+
 		output := fmt.Sprintf(
-			"  %v%%   %v / %v          ",
+			"  %v%%   %v / %v",
 			percent, fmtSize(progress), fmtSize(total),
 		)
+		// Clear previous output.
+		if len(output) > outputLength {
+			outputLength = len(output)
+		}
+		fmt.Printf("\r%v", strings.Repeat(" ", outputLength))
+		// Print new output.
 		fmt.Printf("\r%v", output)
 	}
 
@@ -634,68 +666,17 @@ func dirSize(dir string) (b int64, i int) {
 	return
 }
 
-type snapper struct {
-	snappyWriter *snappy.Writer
-	bufioWriter  *bufio.Writer
-}
-
 // Compress a file to a snappy archive.
-// If the source file is too large for the system to handle,
-//   the snapSafe() function runs instead.
-// Compared to snap(), the compression ratio for this function is lower.
 func snap(src *os.File) (dst *os.File, err error) {
-	srcInfo, err := src.Stat()
-	chkerr(err)
-
-	// Make sure existing files are not overwritten.
-	dstName := concat(src.Name(), ".sz")
-	genUnusedFilename(&dstName)
-
-	// Create the destination file.
-	print(dstName)
-	dst, err = create(dstName, srcInfo.Mode())
-	chkerr(err)
-
-	// If this function encounters an error,
-	//   run the snapSafe() function instead.
-	// Otherwise, re-open the new, compressed file.
+	// Remember to re-open the destination file after compression.
 	defer func() {
-		switch err {
-		case nil:
-			dst, err = os.Open(dstName)
-		default:
-			os.Remove(dst.Name())
-			dst, err = snapSafe(src)
-		}
+		dst, err = os.Open(dst.Name())
 	}()
 
-	// Read the contents of the source file.
-	srcContents, err := ioutil.ReadAll(src)
-	chkerr(err)
-
-	// Prepare to turn the destination file into a snappy file.
-	pt := &passthru{
-		Writer: dst,
-		length: uint64(srcInfo.Size()),
-	}
-	defer func() { pt.Writer = nil }()
-	szw := snappy.NewWriter(pt)
-	defer szw.Reset(nil)
-
-	// Write the source file's contents to the new snappy file.
-	defer println()
-	_, err = szw.Write(srcContents)
-	chkerr(err)
-	return
-}
-
-// Compress a file to a snappy archive.
-// This function runs if the source file is too large
-//   for the snap() function above.
-// Compared to snap(), the compression ratio for this function is lower.
-func snapSafe(src *os.File) (dst *os.File, err error) {
+	// Get file info.
 	srcInfo, err := src.Stat()
 	chkerr(err)
+	srcTotal := uint64(srcInfo.Size())
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(src.Name(), ".sz")
@@ -705,39 +686,59 @@ func snapSafe(src *os.File) (dst *os.File, err error) {
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
 	chkerr(err)
-
-	// Remember to re-open the compressed file  after it has been written.
-	defer func() {
-		if err == nil {
-			dst, err = os.Open(dstName)
-		}
-	}()
 
 	// Set up a *passthru writer in order to print progress.
 	pt := &passthru{
 		Writer: dst,
-		length: uint64(srcInfo.Size()),
+		length: uint64(srcTotal),
 	}
 	defer func() { pt.Writer = nil }()
 
-	// Set up a snappy writer.
-	sz := &snapper{
-		snappyWriter: snappy.NewWriter(pt),
-		bufioWriter:  bufio.NewWriter(nil),
-	}
-	szb := sz.bufioWriter
-	szw := sz.snappyWriter
-	defer szw.Reset(nil)
+	// Wrap a *snappy.Writer around the *passthru method.
+	sz := snappy.NewWriter(pt)
+	defer sz.Reset(nil)
 
 	// Write the source file's contents to the new snappy file.
-	defer println()
-	szb.Reset(szw)
-	defer szb.Reset(nil)
-	_, err = io.Copy(szb, src)
-	src.Close()
+	_, err = snapCopy(sz, src)
+	println()
 	chkerr(err)
-	err = szb.Flush()
-	chkerr(err)
+	return
+}
+
+// snappy.maxUncompressedChunkLen
+const snappyStep = 65536
+
+// Read data from a source file,
+//   compress the data,
+//   and write it to a *snappy.Writer destination file.
+// Serves as a makeshift snappy replacement for io.Copy
+//   as long as the source Reader is an *os.File
+//   and the destination Writer is a *snappy.Writer.
+func snapCopy(sz *snappy.Writer, src *os.File) (written int64, err error) {
+	var tab int
+	for {
+		// Read byte chunk.
+		bytes := make([]byte, snappyStep)
+		nr, _ := src.ReadAt(bytes, int64(tab))
+		// Stop if nothing was read.
+		if nr == 0 {
+			break
+		}
+
+		// Write byte chunk.
+		nw, err := sz.Write(bytes)
+		written += int64(nw)
+		if err != nil {
+			break
+		}
+
+		// Stop if the byte chunk wasn't the max size:
+		//   EOF has been reached.
+		if nr < snappyStep {
+			break
+		}
+		tab += snappyStep
+	}
 	return
 }
 
@@ -750,8 +751,91 @@ type tarAppender struct {
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
-// Create a tar archive of a file.
+// Create a tar archive of a directory.
 func tarDir(dir *os.File) (dst *os.File, err error) {
+	// Remember to re-open the tar archive after creation.
+	defer func() {
+		if err != nil {
+			return
+		}
+		dst, err = os.Open(dst.Name())
+		chkerr(err)
+	}()
+
+	// Get file info for the source directory.
+	dirInfo, err := dir.Stat()
+	chkerr(err)
+	dirName := dir.Name()
+
+	// Make sure existing files are not overwritten.
+	dstName := concat(dirName, ".tar")
+	genUnusedFilename(&dstName)
+	print(dstName)
+	defer println()
+
+	// Create the destination file.
+	dst, err = create(dstName, dirInfo.Mode())
+	chkerr(err)
+
+	// Pipe the destination file through a *tarAppender.
+	var dstWriter io.WriteCloser = dst
+	ta := &tarAppender{
+		tarWriter:   tar.NewWriter(dstWriter),
+		bufioWriter: bufio.NewWriter(nil),
+		hardLinks:   make(map[uint64]string),
+	}
+
+	// Remember to close the tarWriter.
+	defer func() {
+		err = ta.tarWriter.Close()
+		chkerr(err)
+	}()
+
+	// Walk through the directory.
+	// Add a header to the tar archive for each file encountered.
+	var total, progress int
+	var start time.Time
+	if !doQuiet {
+		_, total = dirSize(dirName)
+	}
+	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
+		// Quit if any errors occur.
+		chkerr(err)
+
+		// Add a header for the file.
+		err = ta.add(path, path)
+		chkerr(err)
+
+		// Skip printing progress if user requested it.
+		if doQuiet {
+			return nil
+		}
+
+		// Make sure progress isn't outputted too quickly
+		//   for the console.
+		progress += 1
+		percent := int(float64(progress) / float64(total) * float64(100))
+		if int(time.Since(start)) < 100000 && percent < 100 {
+			return nil
+		}
+		start = time.Now()
+
+		// Print progress.
+		fmt.Printf(
+			"\r  %v%%   %v / %v files",
+			percent, progress, total,
+		)
+		return nil
+	})
+	chkerr(err)
+
+	return
+}
+
+// https://github.com/docker/docker/blob/master/pkg/archive/archive.go
+// Create a tar archive of a directory.
+// Move the created tar archive to the present working directory.
+func tarDirBring(dir *os.File) (dst *os.File, err error) {
 	// Change to the parent directory of 'dir' in order to prevent
 	//   the addition of unnecessary parent directories in the tar archive.
 	dirName := dir.Name()
@@ -772,11 +856,12 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 
 		// Do not move the tar archive
 		//   if the working directory was not changed earlier.
-		if rootDir == "." {
+		if parentDir == "." {
 			// Re-open the tar archive.
 			dst, err = os.Open(dst.Name())
 			return
 		}
+		print(parentDir)
 
 		// Change back to the top working directory.
 		err = os.Chdir(rootDir)
