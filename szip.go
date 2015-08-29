@@ -33,7 +33,7 @@ func init() {
 	flags()
 }
 
-// Check whether user requested help.
+// Check whether the user requested help.
 func chkHelp() {
 	if len(os.Args) < 2 {
 		return
