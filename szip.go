@@ -52,7 +52,7 @@ func help(status int) {
 	fmt.Printf(
 		//"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
 		"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
-		"sz",
+		"szip",
 		"Usage: sz [option ...] [file ...]",
 		"Description:",
 		"    Compress/uncompress files to/from snappy archives.",
