@@ -7,7 +7,8 @@
 Simple command-line program to compress/decompress files into Snappy archives.  
 Written in the language invented by Google, [Go](https://golang.org/), for the compression format invented by Google, [Snappy](https://github.com/google/snappy). [Snappy](https://github.com/google/snappy) aims to be ***FAST*** and stable while still maintaining reasonable compression.  
 ### Compatibility
-This program works in *Linux* and *Android*, but it does **not** work in *Windows*. It also works for **both** *32-bit* and *64-bit* systems (including **arm**). Although I haven't tested it, it probably works on **Mac** also.  
+This program works in *Linux* and *Android*, but it does **not** work in *Windows*. It also works for **both** *32-bit* and *64-bit* systems (including *arm*). Although I haven't tested it, it probably works on **Mac** also.  
+  
 **NOTE:** If you're running *64-bit Linux* and don't have Go installed, you can use the uploaded [sz](https://github.com/GreenRaccoon23/sz/blob/master/sz) binary. For all other systems, Go needs to be installed. Then, Go will build and install the program automatically with this command:
 
     go get https://github.com/GreenRaccoon23/sz.git
