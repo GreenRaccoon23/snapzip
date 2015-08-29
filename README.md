@@ -7,6 +7,7 @@
 Simple command-line program to compress/decompress files into Snappy archives.  
 Written in the language invented by Google, [Go](https://golang.org/), for the compression format invented by Google, [Snappy](https://github.com/google/snappy). [Snappy](https://github.com/google/snappy) aims to be ***FAST*** and stable while still maintaining reasonable compression.  
 This program does **not** work in *Windows*, but it **does** work in *Linux* and *Android*.  
+This program works in *Linux* and *Android*, but it does **not** work in *Windows*.  
 ### Usage
 I wrote this program, `sz`, to make things easy and simple. It automatically tests whether a file should be compressed or decompressed (based on file signatures, not just file extensions), which means that commandline switches are unneeded. Just run:  
 
