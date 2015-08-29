@@ -105,7 +105,7 @@ func flags() {
 // Only remove EXACT matches.
 func filter(slc []string, args ...string) (filtered []string) {
 	for _, s := range slc {
-		if slcHas(slc, s) {
+		if slcHas(args, s) {
 			continue
 		}
 		filtered = append(filtered, s)
