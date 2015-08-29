@@ -307,7 +307,7 @@ func genUnusedFilename(filename *string) {
 		return
 	}
 	base, ext := splitExt(*filename)
-	for i := 1; i < 20091110230000; i++ {
+	for i := 1; i < 20091110; i++ {
 		testname := concat(base, "(", strconv.Itoa(i), ")", ext)
 		if exists(testname) {
 			continue
