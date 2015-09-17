@@ -9,7 +9,7 @@ Written in the language invented by Google, [Go](https://golang.org/), for the c
 ### Compatibility
 This program works on **Linux** and **Android**, but it does *NOT* work on **Windows**. It also works for *both* **32-bit** and **64-bit** systems (including **arm**). Although I haven't tested it, it probably works on **Mac** as well.  
   
-**NOTE:** If you're running *64-bit Linux* and don't have Go installed, you can use the uploaded [snapzip](https://github.com/GreenRaccoon23/szip/blob/master/snapzip) binary. For all other systems, Go needs to be installed. Then, Go will build and install the program automatically with this command:
+**NOTE:** *Android* users can use this precompiled [snapzip](https://github.com/GreenRaccoon23/szip/blob/master/Android_32/snapzip) binary. (It was compiled for armv7l processors but should work with just about any Android device. Test it first to make sure it works.). *64-bit Linux* users who don't have Go installed might be able to use the uploaded [snapzip](https://github.com/GreenRaccoon23/szip/blob/master/Linux_64/snapzip) binary. (Test it first to make sure it works.) For all other systems, Go needs to be installed. Then, Go will build and install the program automatically with this command:
 
     go get https://github.com/GreenRaccoon23/snapzip
 
@@ -18,7 +18,11 @@ I wrote this program, `snapzip`, to make things easy and simple. It automaticall
 
     snapzip file1.txt file2.sz file3.tar.sz directory
 
-^ This command will compress the first file, uncompress the second, uncompress and untar the third, and create a `.tar.sz` archive of the fourth.  
+^ This command will:  
+1. *compress* `file1.txt` to `file1.txt.sz`  
+2. *uncompress* `file2.sz` to `file2`  
+3. *uncompress and untar* `file3.tar.sz` to `file3`  
+4. *tar and compress* `directory` to `directory.tar.sz`  
   
 Also, `snapzip` will **never** overwrite another file; whenever it creates a new file, if another one exists with the same name, it will rename the new one automatically. For example, when running:  
 
