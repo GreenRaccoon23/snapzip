@@ -129,7 +129,6 @@ func slcHas(slc []string, args ...string) bool {
 }
 
 func main() {
-	defer os.Exit(0)
 	/*
 		if doSingleArchive {
 
@@ -223,7 +222,8 @@ func analyze(filename string) error {
 		if doBring {
 			file, err = tarDirBring(file)
 		} else {
-			file, err = tarDir(file)
+			file, err = tarDirAlt(file)
+			//file, err = tarDir(file)
 		}
 		chkerr(err)
 		// Remove to close and remove the temporary tar archive.
@@ -829,6 +829,109 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	})
 	chkerr(err)
 
+	return
+}
+
+// https://github.com/docker/docker/blob/master/pkg/archive/archive.go
+// Create a tar archive of a directory.
+func tarDirAlt(dir *os.File) (dst *os.File, err error) {
+	// Remember to re-open the tar archive after creation.
+	defer func() {
+		if err != nil {
+			return
+		}
+		dst, err = os.Open(dst.Name())
+		chkerr(err)
+	}()
+
+	// Get file info for the source directory.
+	dirInfo, err := dir.Stat()
+	chkerr(err)
+	dirName := dir.Name()
+	baseName := filepath.Base(dirName)
+	parent := filepath.Dir(dirName)
+
+	// Make sure existing files are not overwritten.
+	dstName := concat(baseName, ".tar")
+	genUnusedFilename(&dstName)
+	print(dstName)
+	defer println()
+
+	// Create the destination file.
+	dst, err = create(dstName, dirInfo.Mode())
+	chkerr(err)
+
+	// Pipe the destination file through a *tarAppender.
+	var dstWriter io.WriteCloser = dst
+	ta := &tarAppender{
+		tarWriter:   tar.NewWriter(dstWriter),
+		bufioWriter: bufio.NewWriter(nil),
+		hardLinks:   make(map[uint64]string),
+	}
+
+	// Remember to close the tarWriter.
+	defer func() {
+		err = ta.tarWriter.Close()
+		chkerr(err)
+	}()
+
+	// Walk through the directory.
+	// Add a header to the tar archive for each file encountered.
+	var total, progress int
+	var start time.Time
+	if !doQuiet {
+		_, total = dirSize(dirName)
+	}
+	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
+		// Quit if any errors occur.
+		chkerr(err)
+
+		// Don't use the full path of the file in its header name.
+		// Otherwise, the archive may extract an unnecessarily long path with
+		//   anoying, empty diretories.
+		// E.g., make an archive of '/home/me/Documents' extract to
+		//   'Documents', not to '/home/me/Documents'.
+		name, err := filepath.Rel(parent, path)
+		chkerr(err)
+
+		// Add a header for the file.
+		err = ta.add(path, name)
+		chkerr(err)
+
+		// Skip printing progress if user requested it.
+		if doQuiet {
+			return nil
+		}
+
+		// Make sure progress isn't outputted too quickly
+		//   for the console.
+		progress += 1
+		percent := int(float64(progress) / float64(total) * float64(100))
+		if int(time.Since(start)) < 100000 && percent < 100 {
+			return nil
+		}
+		start = time.Now()
+
+		// Print progress.
+		fmt.Printf(
+			"\r  %v%%   %v / %v files",
+			percent, progress, total,
+		)
+		return nil
+	})
+	chkerr(err)
+
+	return
+}
+
+// Return the individual names and combined size of all contents in a
+//   directory.
+func dirContents(dir string) (contents []string, totalSize int64) {
+	filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
+		contents = append(contents, path)
+		totalSize += fi.Size()
+		return nil
+	})
 	return
 }
 
