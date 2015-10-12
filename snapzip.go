@@ -216,8 +216,7 @@ func analyze(filename string) error {
 	//   results in a much lower compression ratio.)
 	case isDir(file):
 		// Tar it.
-		file, err = tarDirAlt(file)
-		//file, err = tarDir(file)
+		file, err = tarDir(file)
 		chkerr(err)
 		// Remove to close and remove the temporary tar archive.
 		defer func() {
@@ -745,88 +744,6 @@ type tarAppender struct {
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Create a tar archive of a directory.
 func tarDir(dir *os.File) (dst *os.File, err error) {
-	// Remember to re-open the tar archive after creation.
-	defer func() {
-		if err != nil {
-			return
-		}
-		dst, err = os.Open(dst.Name())
-		chkerr(err)
-	}()
-
-	// Get file info for the source directory.
-	dirInfo, err := dir.Stat()
-	chkerr(err)
-	dirName := dir.Name()
-
-	// Make sure existing files are not overwritten.
-	dstName := concat(dirName, ".tar")
-	genUnusedFilename(&dstName)
-	print(dstName)
-	defer println()
-
-	// Create the destination file.
-	dst, err = create(dstName, dirInfo.Mode())
-	chkerr(err)
-
-	// Pipe the destination file through a *tarAppender.
-	var dstWriter io.WriteCloser = dst
-	ta := &tarAppender{
-		tarWriter:   tar.NewWriter(dstWriter),
-		bufioWriter: bufio.NewWriter(nil),
-		hardLinks:   make(map[uint64]string),
-	}
-
-	// Remember to close the tarWriter.
-	defer func() {
-		err = ta.tarWriter.Close()
-		chkerr(err)
-	}()
-
-	// Walk through the directory.
-	// Add a header to the tar archive for each file encountered.
-	var total, progress int
-	var start time.Time
-	if !doQuiet {
-		total = dirSize(dirName)
-	}
-	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
-		// Quit if any errors occur.
-		chkerr(err)
-
-		// Add a header for the file.
-		err = ta.add(path, path)
-		chkerr(err)
-
-		// Skip printing progress if user requested it.
-		if doQuiet {
-			return nil
-		}
-
-		// Make sure progress isn't outputted too quickly
-		//   for the console.
-		progress += 1
-		percent := int(float64(progress) / float64(total) * float64(100))
-		if int(time.Since(start)) < 100000 && percent < 100 {
-			return nil
-		}
-		start = time.Now()
-
-		// Print progress.
-		fmt.Printf(
-			"\r  %v%%   %v / %v files",
-			percent, progress, total,
-		)
-		return nil
-	})
-	chkerr(err)
-
-	return
-}
-
-// https://github.com/docker/docker/blob/master/pkg/archive/archive.go
-// Create a tar archive of a directory.
-func tarDirAlt(dir *os.File) (dst *os.File, err error) {
 	// Remember to re-open the tar archive after creation.
 	defer func() {
 		if err != nil {
