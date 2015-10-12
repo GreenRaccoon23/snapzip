@@ -299,7 +299,10 @@ func genUnusedFilename(filename *string) {
 		return
 	}
 	base, ext := splitExt(*filename)
+	// Go's date of birth. :)
 	for i := 1; i < 20091110; i++ {
+		// May change this convention later,
+		//   since bash doesn't like the parentheses.
 		testname := concat(base, "(", strconv.Itoa(i), ")", ext)
 		if exists(testname) {
 			continue
@@ -473,7 +476,7 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 	// Make sure existing files are not overwritten.
 	dstName := strings.TrimSuffix(srcName, ".sz")
 	genUnusedFilename(&dstName)
-	print(srcName)
+	print(concat(srcName, "  >  ", dstName))
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
@@ -553,7 +556,7 @@ func untar(file *os.File) error {
 	tr = tar.NewReader(file)
 
 	// Extract the archive.
-	print(dstName)
+	print(concat(name, "  >  ", dstName))
 	defer println()
 	var progress uint64
 	var outputLength int
@@ -668,11 +671,12 @@ func snap(src *os.File) (dst *os.File, err error) {
 	srcInfo, err := src.Stat()
 	chkerr(err)
 	srcTotal := uint64(srcInfo.Size())
+	srcName := src.Name()
 
 	// Make sure existing files are not overwritten.
-	dstName := concat(src.Name(), ".sz")
+	dstName := concat(srcName, ".sz")
 	genUnusedFilename(&dstName)
-	print(dstName)
+	print(concat(srcName, "  >  ", dstName))
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
@@ -763,7 +767,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
 	genUnusedFilename(&dstName)
-	print(dstName)
+	print(concat(dirName, "  >  ", dstName))
 	defer println()
 
 	// Create the destination file.
@@ -830,17 +834,6 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	})
 	chkerr(err)
 
-	return
-}
-
-// Return the individual names and combined size of all contents in a
-//   directory.
-func dirContents(dir string) (contents []string, totalSize int64) {
-	filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
-		contents = append(contents, path)
-		totalSize += fi.Size()
-		return nil
-	})
 	return
 }
 
