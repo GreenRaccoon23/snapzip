@@ -657,9 +657,8 @@ func fmtDir(name *string) {
 }
 
 // Return the total size in bytes and number of files under a directory.
-func dirSize(dir string) (b int64, i int) {
+func dirSize(dir string) (i int) {
 	filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
-		b += fi.Size()
 		i += 1
 		return nil
 	})
@@ -796,7 +795,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	var total, progress int
 	var start time.Time
 	if !doQuiet {
-		_, total = dirSize(dirName)
+		total = dirSize(dirName)
 	}
 	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
 		// Quit if any errors occur.
@@ -880,7 +879,7 @@ func tarDirAlt(dir *os.File) (dst *os.File, err error) {
 	var total, progress int
 	var start time.Time
 	if !doQuiet {
-		_, total = dirSize(dirName)
+		total = dirSize(dirName)
 	}
 	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
 		// Quit if any errors occur.
@@ -1013,7 +1012,7 @@ func tarDirBring(dir *os.File) (dst *os.File, err error) {
 	var total, progress int
 	var start time.Time
 	if !doQuiet {
-		_, total = dirSize(dirName)
+		total = dirSize(dirName)
 		fmt.Println(dstName)
 		defer fmt.Println()
 	}
