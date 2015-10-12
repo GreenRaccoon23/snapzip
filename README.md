@@ -7,9 +7,15 @@
 Simple command-line program to compress/decompress files into Snappy archives.  
 Written in the language invented by Google, [Go](https://golang.org/), for the compression format invented by Google, [Snappy](https://github.com/google/snappy). [Snappy](https://github.com/google/snappy) aims to be ***FAST*** and stable while still maintaining reasonable compression.  
 ### Compatibility
-This program works on **Linux** and **Android**, but it does *NOT* work on **Windows**. It also works for *both* **32-bit** and **64-bit** systems (including **arm**). Although I haven't tested it, it probably works on **Mac** as well.  
+This program works on **Linux** and **Android**, but it does *NOT* work on **Windows**. It also works for *both* **32-bit** and **64-bit** processors (including arm). Although I haven't tested it, it should work on **Mac** as well.  
   
-**NOTE:** *Android* users can use this precompiled [snapzip](https://github.com/GreenRaccoon23/szip/blob/master/Android_32/snapzip) binary. (It was compiled for armv7l processors but should work with just about any Android device. Test it first to make sure it works.). *64-bit Linux* users who don't have Go installed might be able to use the uploaded [snapzip](https://github.com/GreenRaccoon23/szip/blob/master/Linux_64/snapzip) binary. (Test it first to make sure it works.) For all other systems, Go needs to be installed. Then, Go will build and install the program automatically with this command:
+**Android** users can use [this](https://github.com/GreenRaccoon23/snapzip/raw/master/Android_32/snapzip) precompiled binary. It was compiled for armv7 processors, which almost every Android device uses currently. Test it first to make sure it works.  
+  
+**32-bit Linux** users can use [this](https://github.com/GreenRaccoon23/snapzip/raw/master/Linux_32/snapzip) precompiled binary. Test it first to make sure it works.  
+
+**64-bit Linux** users can use [this](https://github.com/GreenRaccoon23/snapzip/raw/master/Linux_64/snapzip) precompiled binary. Test it first to make sure it works.  
+  
+**All other systems** need to have [Go](https://golang.org/dl/) installed in order to use this program. Go will build and install the program automatically with this command:
 
     go get https://github.com/GreenRaccoon23/snapzip
 
@@ -25,13 +31,13 @@ I wrote this program, `snapzip`, to make things easy and simple. It automaticall
 4. *tar and compress* `directory` to `directory.tar.sz`  
 
 ### Additional Notes
-[Snappy](https://github.com/google/snappy) compression is **extremely stable**. Personally, I've compressed and decompressed a few terabytes so far with this program and have **never** had a single corrupt file.  
+[Snappy](https://github.com/google/snappy) compression is **extremely stable**. Personally, I've compressed and decompressed a few terabytes so far with this program and have **never** had a single corrupt file. :smile:  
   
-Also, `snapzip` will **never** overwrite another file; whenever it creates a new file, if another one exists with the same name, it will rename the new one automatically to an unused name. For example, when running:  
+Also, as an added convenience, `snapzip` will **never** overwrite another file; it automatically generates an unused name when creating a file. For example, when running:  
 
-    snapzip file.apk
+    snapzip file.js
 
-if `file.apk.sz` already exists, the compressed file will be named `file(1).apk.sz` (unless that one already exists too, then the name will be `file(2).apk.sz`, and so on).  
+if `file.js.sz` already exists, the compressed file will be named `file(1).js.sz` (unless that one already exists too, then the name will be `file(2).js.sz`, and so on).  
 
 ### Resources
 I uploaded this program for simplicity's and portability's sake (installation only requires one command and 3 seconds). For a more robust and even faster alternative written in C, go to:  
