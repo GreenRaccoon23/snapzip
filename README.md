@@ -23,12 +23,16 @@ I wrote this program, `snapzip`, to make things easy and simple. It automaticall
 2. *uncompress* `file2.sz` to `file2`  
 3. *uncompress and untar* `file3.tar.sz` to `file3`  
 4. *tar and compress* `directory` to `directory.tar.sz`  
+
+### Additional Notes
+[Snappy](https://github.com/google/snappy) compression is **extremely stable**. Personally, I've compressed and decompressed a few terabytes so far with this program and have **never** had a single corrupt file.  
   
-Also, `snapzip` will **never** overwrite another file; whenever it creates a new file, if another one exists with the same name, it will rename the new one automatically. For example, when running:  
+Also, `snapzip` will **never** overwrite another file; whenever it creates a new file, if another one exists with the same name, it will rename the new one automatically to an unused name. For example, when running:  
 
     snapzip file.apk
 
 if `file.apk.sz` already exists, the compressed file will be named `file(1).apk.sz` (unless that one already exists too, then the name will be `file(2).apk.sz`, and so on).  
+
 ### Resources
 I uploaded this program for simplicity's and portability's sake (installation only requires one command and 3 seconds). For a more robust and even faster alternative written in C, go to:  
 [https://github.com/kubo/snzip](https://github.com/kubo/snzip)  
