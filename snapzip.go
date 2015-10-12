@@ -50,8 +50,8 @@ func chkHelp() {
 func help(status int) {
 	defer os.Exit(status)
 	fmt.Printf(
-		//"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
-		"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
+		//"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
+		"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
 		"snapzip",
 		"Usage: snapzip [option ...] [file ...]",
 		"Description:",
@@ -59,8 +59,6 @@ func help(status int) {
 		"Options:",
 		//"   -a <name>    Compress all files into a single snappy archive.",
 		//"                (default is to compress each file individually)",
-		"   -b           Bring compressed files to the present working",
-		"                  directory.",
 		"   -q           Do not show any output",
 		"Notes:",
 		"    This program automatically determines whether a file should be",
@@ -79,8 +77,7 @@ func flags() {
 	}
 
 	// Parse commandline arguments.
-	flag.StringVar(&dstArchive, "a", "", "")
-	flag.BoolVar(&doBring, "b", false, "")
+	//flag.StringVar(&dstArchive, "a", "", "")
 	flag.BoolVar(&doQuiet, "q", false, "")
 	flag.Parse()
 
@@ -91,7 +88,7 @@ func flags() {
 	}
 
 	if doQuiet {
-		bools := []string{"-b", "-q"}
+		bools := []string{"-q"}
 		trgtFiles = filter(trgtFiles, bools...)
 	}
 	if dstArchive != "" {
@@ -219,12 +216,8 @@ func analyze(filename string) error {
 	//   results in a much lower compression ratio.)
 	case isDir(file):
 		// Tar it.
-		if doBring {
-			file, err = tarDirBring(file)
-		} else {
-			file, err = tarDirAlt(file)
-			//file, err = tarDir(file)
-		}
+		file, err = tarDirAlt(file)
+		//file, err = tarDir(file)
 		chkerr(err)
 		// Remove to close and remove the temporary tar archive.
 		defer func() {
@@ -931,114 +924,6 @@ func dirContents(dir string) (contents []string, totalSize int64) {
 		totalSize += fi.Size()
 		return nil
 	})
-	return
-}
-
-// https://github.com/docker/docker/blob/master/pkg/archive/archive.go
-// Create a tar archive of a directory.
-// Move the created tar archive to the present working directory.
-func tarDirBring(dir *os.File) (dst *os.File, err error) {
-	// Change to the parent directory of 'dir' in order to prevent
-	//   the addition of unnecessary parent directories in the tar archive.
-	dirName := dir.Name()
-	rootDir, err := os.Getwd()
-	chkerr(err)
-	fmtDir(&rootDir)
-	parentDir := filepath.Dir(dirName)
-	fmtDir(&parentDir)
-	err = os.Chdir(parentDir)
-	chkerr(err)
-
-	// Remember to 'popd' and to move the tar archive to the
-	//  top/root working directory.
-	defer func(origName string) {
-		if err != nil {
-			return
-		}
-
-		// Do not move the tar archive
-		//   if the working directory was not changed earlier.
-		if parentDir == "." {
-			// Re-open the tar archive.
-			dst, err = os.Open(dst.Name())
-			return
-		}
-		print(parentDir)
-
-		// Change back to the top working directory.
-		err = os.Chdir(rootDir)
-		chkerr(err)
-		// Move the tar archive to the top working directory.
-		oldName := concat(parentDir, dst.Name())
-		newName := concat(filepath.Base(origName), ".tar")
-		genUnusedFilename(&newName)
-		err = os.Rename(oldName, newName)
-		chkerr(err)
-		// Re-open the tar archive.
-		dst, err = os.Open(newName)
-	}(dirName)
-
-	// Re-open the source directory.
-	dir, err = os.Open(filepath.Base(dirName))
-	chkerr(err)
-
-	// Get file info for the source directory.
-	dirInfo, err := dir.Stat()
-	chkerr(err)
-	dirName = dir.Name()
-
-	// Create the destination file.
-	dstName := concat(dirName, ".tar")
-	genUnusedFilename(&dstName)
-	dst, err = create(dstName, dirInfo.Mode())
-	chkerr(err)
-
-	// Pipe the destination file through a *tarAppender.
-	var dstWriter io.WriteCloser = dst
-	ta := &tarAppender{
-		tarWriter:   tar.NewWriter(dstWriter),
-		bufioWriter: bufio.NewWriter(nil),
-		hardLinks:   make(map[uint64]string),
-	}
-
-	// Remember to close the tarWriter.
-	defer func() {
-		err = ta.tarWriter.Close()
-		chkerr(err)
-	}()
-
-	// Walk through the directory.
-	// Add a header to the tar archive for each file encountered.
-	var total, progress int
-	var start time.Time
-	if !doQuiet {
-		total = dirSize(dirName)
-		fmt.Println(dstName)
-		defer fmt.Println()
-	}
-	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
-		chkerr(err)
-
-		err = ta.add(path, path)
-		chkerr(err)
-
-		if doQuiet {
-			return nil
-		}
-		progress += 1
-		percent := int(float64(progress) / float64(total) * float64(100))
-		if int(time.Since(start)) < 100000 && percent < 100 {
-			return nil
-		}
-		start = time.Now()
-		output := fmt.Sprintf(
-			"  %v%%   %v / %v files",
-			percent, progress, total,
-		)
-		fmt.Printf("\r%v", output)
-		return nil
-	})
-
 	return
 }
 
