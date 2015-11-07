@@ -50,21 +50,18 @@ func chkHelp() {
 func help(status int) {
 	defer os.Exit(status)
 	fmt.Printf(
-		//"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
-		"%s\n\n  %s\n\n  %s\n%s\n\n  %s\n%s\n\n  %s\n%s\n%s\n%s\n%s\n",
-		"snapzip",
-		"Usage: snapzip [option ...] [file ...]",
-		"Description:",
-		"    Compress/uncompress files to/from snappy archives.",
-		"Options:",
-		//"   -a <name>    Compress all files into a single snappy archive.",
-		//"                (default is to compress each file individually)",
-		"   -q           Do not show any output",
-		"Notes:",
-		"    This program automatically determines whether a file should be",
-		"      compressed or decompressed.",
-		"    This program can also compress directories;",
-		"      they are added to a tar archive prior to compression.",
+		"%s\n",
+		`snapzip
+Usage: snapzip [option ...] [file ...]
+Description:
+    Compress/uncompress files to/from snappy archives.
+Options:
+    -q        Do not show any output
+Notes:
+    This program automatically determines whether a file should be
+      compressed or decompressed.
+    This program can also compress directories;
+      they are added to a tar archive prior to compression.`,
 	)
 }
 
@@ -475,6 +472,7 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := strings.TrimSuffix(srcName, ".sz")
+
 	genUnusedFilename(&dstName)
 	print(concat(srcName, "  >  ", dstName))
 
