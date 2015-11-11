@@ -17,7 +17,7 @@ This program works on **Linux** and **Android**, but it does *NOT* work on **Win
   
 **All other systems** need to have [Go](https://golang.org/dl/) installed in order to use this program. Go will build and install the program automatically with this command:
 
-    go get https://github.com/GreenRaccoon23/snapzip
+    go get github.com/GreenRaccoon23/snapzip
 
 ### Usage
 I wrote this program, `snapzip`, to make things easy and simple. It automatically tests whether a file should be compressed or decompressed (based on file signatures, not just file extensions), which means that commandline switches are unneeded. Just run:  
