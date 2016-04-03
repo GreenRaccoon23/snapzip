@@ -13,9 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
+	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/golang/snappy"
 )
@@ -128,14 +127,23 @@ func main() {
 
 		}
 	*/
+
+	var wg sync.WaitGroup
+	lenTrgtFiles := len(trgtFiles)
+	wg.Add(lenTrgtFiles)
+
 	for _, f := range trgtFiles {
-		//f = filepath.Clean(f)
-		err := analyze(f)
-		if err == nil || doQuiet {
-			continue
-		}
-		print(err)
+		go func(f string) {
+			defer wg.Done()
+			//f = filepath.Clean(f)
+			err := analyze(f)
+			if err != nil && !doQuiet {
+				print(err)
+			}
+		}(f)
 	}
+
+	wg.Wait()
 }
 
 // Pass to fmt.Println() unless quiet mode is active.
@@ -281,7 +289,7 @@ func isTar(file *os.File) bool {
 
 // Create a file if it doesn't exist. Otherwise, just open it.
 func create(filename string, mode os.FileMode) (*os.File, error) {
-	genUnusedFilename(&filename)
+	// genUnusedFilename(&filename)
 	file, err := os.OpenFile(
 		filename,
 		os.O_RDWR|os.O_CREATE|os.O_APPEND,
@@ -502,43 +510,12 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 // Extract a tar archive.
 func untar(file *os.File) error {
-	// Get file info.
-	fi, err := file.Stat()
-	chkerr(err)
-	total := uint64(fi.Size())
-	name := fi.Name()
-
-	// Wrap a *tar.Reader around the *os.File.
-	tr := tar.NewReader(file)
-
 	// Get the smallest directory name (top directory).
-	var topDir string
-	for {
-		var hdr *tar.Header
-		hdr, err = tr.Next()
-		// Break if the end of the tar archive has been reached.
-		if err == io.EOF {
-			err = nil
-			break
-		}
-		// Set topDir to the very first header name.
-		// Most likely, this will be the name of the top directory anyway.
-		if topDir == "" {
-			topDir = hdr.Name
-		}
-		if hdr.Typeflag != tar.TypeDir {
-			continue
-		}
-		// The top directory is the shortest path and has the shortest name.
-		if len(hdr.Name) < len(topDir) {
-			topDir = hdr.Name
-		}
-	}
-	// If no names were found, the data is corrupt.
-	if topDir == "" {
-		err = fmt.Errorf("Unable to read %v. Data is corrupt.", name)
+	topDir, err := findTopDirInArchive(file)
+	if err != nil {
 		return err
 	}
+
 	// Strip off the trailing '/'.
 	topDir = topDir[0 : len(topDir)-1]
 
@@ -547,11 +524,19 @@ func untar(file *os.File) error {
 	genUnusedFilename(&dstName)
 
 	// Re-open the readers.
-	tr = tar.NewReader(nil)
-	file.Close()
 	file, err = os.Open(file.Name())
-	chkerr(err)
-	tr = tar.NewReader(file)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(file)
+
+	// Get file info.
+	fi, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	total := uint64(fi.Size())
+	name := fi.Name()
 
 	// Extract the archive.
 	print(concat(name, "  >  ", dstName))
@@ -562,12 +547,14 @@ func untar(file *os.File) error {
 	for {
 		var hdr *tar.Header
 		hdr, err = tr.Next()
+
 		// Break if the end of the tar archive has been reached.
-		if err == io.EOF {
-			err = nil
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
 			break
 		}
-		chkerr(err)
 
 		// Make sure existing files are not overwritten.
 		name := hdr.Name
@@ -578,31 +565,33 @@ func untar(file *os.File) error {
 		case tar.TypeDir:
 			// Extract a directory.
 			err = os.MkdirAll(name, os.FileMode(hdr.Mode))
-			chkerr(err)
 
 		case tar.TypeReg, tar.TypeRegA:
 			// Extract a regular file.
 			var w *os.File
 			w, err = create(name, os.FileMode(hdr.Mode))
-			chkerr(err)
+			if err != nil {
+				break
+			}
 			_, err = io.Copy(w, tr)
-			chkerr(err)
 			w.Close()
 
 		case tar.TypeLink:
 			// Extract a hard link.
 			err = os.Link(hdr.Linkname, name)
-			chkerr(err)
 
 		case tar.TypeSymlink:
 			// Extract a symlink.
 			err = os.Symlink(hdr.Linkname, name)
-			chkerr(err)
 
 		default:
 			// If the Typeflag is missing, the data is probably corrupt.
 			// Just skip to the next one anyway if this happens.
 			continue
+		}
+
+		if err != nil {
+			break
 		}
 
 		// Print progress.
@@ -636,6 +625,53 @@ func untar(file *os.File) error {
 		return fmt.Errorf("%v\nFailed to extract %v", err, name)
 	}
 	return nil
+}
+
+// Search a tar file for the top-level directory to be extracted.
+func findTopDirInArchive(file *os.File) (topDir string, err error) {
+	// Wrap a *tar.Reader around the *os.File.
+	tr := tar.NewReader(file)
+	defer func() {
+		tr = nil
+		file.Close()
+	}()
+
+	// Get the smallest directory name (top directory).
+	for {
+		var hdr *tar.Header
+		hdr, err = tr.Next()
+
+		// Break if the end of the tar archive has been reached.
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			break
+		}
+
+		// Set topDir to the very first header name.
+		// Most likely, this will be the name of the top directory anyway.
+		if topDir == "" {
+			topDir = hdr.Name
+		}
+
+		// Skip non-directories.
+		if hdr.Typeflag != tar.TypeDir {
+			continue
+		}
+
+		// The top directory is the shortest path and has the shortest name.
+		if len(hdr.Name) < len(topDir) {
+			topDir = hdr.Name
+		}
+	}
+
+	// If no names were found, the data is corrupt.
+	if topDir == "" {
+		err = fmt.Errorf("Unable to read %v. Data is corrupt.", file.Name())
+	}
+
+	return
 }
 
 // Append a "/" to a string if it doesn't have one already.
@@ -693,13 +729,14 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Write the source file's contents to the new snappy file.
 	_, err = snapCopy(sz, src)
+	// _, err = io.Copy(sz, src)
 	println()
 	chkerr(err)
 	return
 }
 
 // snappy.maxUncompressedChunkLen
-const snappyStep = 65536
+const SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN = 65536
 
 // Read data from a source file,
 //   compress the data,
@@ -707,31 +744,44 @@ const snappyStep = 65536
 // Serves as a makeshift snappy replacement for io.Copy
 //   as long as the source Reader is an *os.File
 //   and the destination Writer is a *snappy.Writer.
-func snapCopy(sz *snappy.Writer, src *os.File) (written int64, err error) {
-	var tab int
-	for {
-		// Read byte chunk.
-		bytes := make([]byte, snappyStep)
-		nr, _ := src.ReadAt(bytes, int64(tab))
-		// Stop if nothing was read.
-		if nr == 0 {
-			break
-		}
+func snapCopy(sz *snappy.Writer, src *os.File) (totalWritten int64, err error) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	wg.Done()
 
-		// Write byte chunk.
-		nw, err := sz.Write(bytes)
-		written += int64(nw)
+	for {
 		if err != nil {
 			break
 		}
 
-		// Stop if the byte chunk wasn't the max size:
-		//   EOF has been reached.
-		if nr < snappyStep {
+		chunk := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
+		// Read byte chunk.
+		nRead, _ := src.Read(chunk)
+		// Stop if nothing was read.
+		if nRead == 0 {
 			break
 		}
-		tab += snappyStep
+
+		wg.Wait()
+
+		// Write byte chunk.
+		wg.Add(1)
+		go func(chunk []byte) {
+			defer wg.Done()
+			var nWritten int
+			nWritten, err = sz.Write(chunk)
+			totalWritten += int64(nWritten)
+		}(chunk)
+
+		// Stop if the 'src' Reader did not read the maxiumum amount of bytes,
+		//   i.e., it reached EOF.
+		if nRead < SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN {
+			break
+		}
 	}
+
+	wg.Wait()
+
 	return
 }
 
@@ -757,7 +807,9 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 
 	// Get file info for the source directory.
 	dirInfo, err := dir.Stat()
-	chkerr(err)
+	if err != nil {
+		return
+	}
 	dirName := dir.Name()
 	baseName := filepath.Base(dirName)
 	parent := filepath.Dir(dirName)
@@ -765,12 +817,17 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
 	genUnusedFilename(&dstName)
-	print(concat(dirName, "  >  ", dstName))
-	defer println()
+
+	if !doQuiet {
+		fmt.Println(concat(dirName, "  >  ", dstName))
+		defer fmt.Println()
+	}
 
 	// Create the destination file.
 	dst, err = create(dstName, dirInfo.Mode())
-	chkerr(err)
+	if err != nil {
+		return
+	}
 
 	// Pipe the destination file through a *tarAppender.
 	var dstWriter io.WriteCloser = dst
@@ -783,7 +840,6 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	// Remember to close the tarWriter.
 	defer func() {
 		err = ta.tarWriter.Close()
-		chkerr(err)
 	}()
 
 	// Walk through the directory.
@@ -795,7 +851,9 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	}
 	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
 		// Quit if any errors occur.
-		chkerr(err)
+		if err != nil {
+			return err
+		}
 
 		// Don't use the full path of the file in its header name.
 		// Otherwise, the archive may extract an unnecessarily long path with
@@ -803,11 +861,14 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 		// E.g., make an archive of '/home/me/Documents' extract to
 		//   'Documents', not to '/home/me/Documents'.
 		name, err := filepath.Rel(parent, path)
-		chkerr(err)
+		if err != nil {
+			return err
+		}
 
 		// Add a header for the file.
-		err = ta.add(path, name)
-		chkerr(err)
+		if err = ta.add(path, name); err != nil {
+			return err
+		}
 
 		// Skip printing progress if user requested it.
 		if doQuiet {
@@ -830,7 +891,6 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 		)
 		return nil
 	})
-	chkerr(err)
 
 	return
 }
@@ -865,7 +925,7 @@ func (ta *tarAppender) add(path, name string) error {
 	hdr.Name = name
 
 	// Check if the file has hard links.
-	nlink, inode, err := tarSetHeader(hdr, fi.Sys())
+	hasHardLinks, inode, err := tarSetHeader(hdr, fi.Sys())
 	if err != nil {
 		return err
 	}
@@ -875,7 +935,7 @@ func (ta *tarAppender) add(path, name string) error {
 	// If the tar archive contains another hardlink to this file's inode,
 	//   set it as a "hardlink" in the tar header.
 	// Otherwise, treat it as a regular file.
-	if fi.Mode().IsRegular() && nlink > 1 {
+	if fi.Mode().IsRegular() && hasHardLinks {
 		// If this file is NOT the first found hardlink to this inode,
 		//   set the previously found hardlink as its 'Linkname'.
 		if oldpath, ok := ta.hardLinks[inode]; ok {
@@ -930,87 +990,4 @@ func (ta *tarAppender) add(path, name string) error {
 		}
 	}
 	return nil
-}
-
-// https://github.com/docker/docker/blob/master/pkg/archive/archive_unix.go
-// Add a file's device major and minor numbers
-//   to the file's header within a tar archive.
-// Return the file's inode and the number of hardlinks to that inode.
-func tarSetHeader(hdr *tar.Header, stat interface{}) (nlink uint32, inode uint64, err error) {
-	s, ok := stat.(*syscall.Stat_t)
-	if !ok {
-		err = fmt.Errorf("cannot convert stat value to syscall.Stat_t")
-		return
-	}
-
-	nlink = uint32(s.Nlink)
-	inode = uint64(s.Ino)
-
-	// Currently go does not fil in the major/minors
-	if s.Mode&syscall.S_IFBLK != 0 || s.Mode&syscall.S_IFCHR != 0 {
-		hdr.Devmajor = int64(devmajor(uint64(s.Rdev)))
-		hdr.Devminor = int64(devminor(uint64(s.Rdev)))
-	}
-
-	return
-}
-
-// https://github.com/docker/docker/blob/master/pkg/archive/archive_unix.go
-// Return the device major number of system data from syscall.Stat_t.Rdev.
-func devmajor(device uint64) uint64 {
-	return (device >> 8) & 0xfff
-}
-
-// https://github.com/docker/docker/blob/master/pkg/archive/archive_unix.go
-// Return the device minor number of system data from syscall.Stat_t.Rdev.
-func devminor(device uint64) uint64 {
-	return (device & 0xff) | ((device >> 12) & 0xfff00)
-}
-
-// https://github.com/docker/docker/blob/master/pkg/system/xattrs_linux.go
-// Get the underlying data for an xattr of a file.
-// Return a nil slice and nil error if the xattr is not set.
-// Other than that, I have no idea how this function works.
-func lgetxattr(path string, attr string) ([]byte, error) {
-	pathBytes, err := syscall.BytePtrFromString(path)
-	if err != nil {
-		return nil, err
-	}
-	attrBytes, err := syscall.BytePtrFromString(attr)
-	if err != nil {
-		return nil, err
-	}
-
-	dest := make([]byte, 128)
-	destBytes := unsafe.Pointer(&dest[0])
-	sz, _, errno := syscall.Syscall6(
-		syscall.SYS_LGETXATTR,
-		uintptr(unsafe.Pointer(pathBytes)),
-		uintptr(unsafe.Pointer(attrBytes)),
-		uintptr(destBytes),
-		uintptr(len(dest)),
-		0,
-		0,
-	)
-	if errno == syscall.ENODATA {
-		return nil, nil
-	}
-	if errno == syscall.ERANGE {
-		dest = make([]byte, sz)
-		destBytes := unsafe.Pointer(&dest[0])
-		sz, _, errno = syscall.Syscall6(
-			syscall.SYS_LGETXATTR,
-			uintptr(unsafe.Pointer(pathBytes)),
-			uintptr(unsafe.Pointer(attrBytes)),
-			uintptr(destBytes),
-			uintptr(len(dest)),
-			0,
-			0,
-		)
-	}
-	if errno != 0 {
-		return nil, errno
-	}
-
-	return dest[:sz], nil
 }
