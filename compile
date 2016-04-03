@@ -52,7 +52,8 @@ _build() {
     fi;
 
     local dst="${osCapitalized}_${bits}";
-    mv "${PKG_NAME}" "${dst}/";
+
+    mv "${binary}" "${dst}/";
 
     if [ $? != 0 ]; then
         local statusCode=$?;
