@@ -1,0 +1,76 @@
+#!/bin/bash
+
+declare -r PKG_NAME="${PWD##*/}";
+
+declare -r OS_LINUX="linux";
+declare -r OS_MAC="darwin";
+declare -r OS_WINDOWS="windows";
+declare -r OS_ANDROID="android";
+
+declare -r ARCH_32="386";
+declare -r ARCH_64="amd64";
+declare -r ARCH_32_ARM="arm";
+declare -r ARCH_64_ARM="arm64";
+
+# Capitalize the first letter of a string.
+_capitalize() {
+    # For Bash 4+:
+    echo "${1^}";
+    # For zsh:
+    # echo "${(C)1}";
+}
+
+# Run `go build` and move the compiled binary to its destination folder.
+_build() {
+    if [ -e "${PKG_NAME}" ]; then
+        gvfs-trash "${PKG_NAME}";
+    fi;
+
+    local os="${1}";
+    local arch="${2}";
+    GOOS="${1}" GOARCH="${2}" go build;
+
+    if [ $? != 0 ]; then
+        local statusCode=$?;
+        echo "Build failed for '${os}' on '${arch}' architecture";
+        exit "${statusCode}";
+    else
+        echo "Build successful for '${os}' on '${arch}' architecture";
+    fi;
+
+    local binary="${PKG_NAME}";
+    if [ "${os}" = "${OS_WINDOWS}" ]; then
+        binary="${PKG_NAME}.exe";
+    fi;
+
+    local osCapitalized;
+    osCapitalized="$(_capitalize "${os}")";
+
+    local bits="32";
+    if [ "${arch: -2}" = "64" ]; then
+        bits="64";
+    fi;
+
+    local dst="${osCapitalized}_${bits}";
+    mv "${PKG_NAME}" "${dst}/";
+
+    if [ $? != 0 ]; then
+        local statusCode=$?;
+        echo "Failed to move '${PKG_NAME}' to '${dst}/'";
+        exit "${statusCode}";
+    fi;
+}
+
+_main() {
+    local os;
+    for os in "${OS_LINUX}" "${OS_MAC}" "${OS_WINDOWS}"; do
+    # for os in "${OS_WINDOWS}" "${OS_LINUX}" "${OS_MAC}"; do
+        _build "${os}" "${ARCH_32}";
+        _build "${os}" "${ARCH_64}";
+    done;
+
+    # _build "${OS_ANDROID}" "${ARCH_32_ARM}";
+    # _build "${OS_ANDROID}" "${ARCH_64_ARM}";
+}
+
+_main;
