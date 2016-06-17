@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GreenRaccoon23/slices"
 	"github.com/golang/snappy"
 )
 
@@ -85,40 +86,13 @@ func setGlobalVars() {
 
 	if DoQuiet {
 		boolArgs := []string{"-q"}
-		Files = filter(Files, boolArgs...)
+		Files = slices.Filter(Files, boolArgs...)
 	}
 	// if dstArchive != "" {
 	// 	// doSingleArchive = true
-	// 	Files = filter(Files, dstArchive)
+	// 	Files = slices.Filter(Files, dstArchive)
 	// }
 	return
-}
-
-// Remove elements in a slice (if they exist).
-// Only remove EXACT matches.
-func filter(slc []string, args ...string) (filtered []string) {
-	for _, s := range slc {
-		if slcHas(args, s) {
-			continue
-		}
-		filtered = append(filtered, s)
-	}
-	return
-}
-
-// Check whether a slice contains a string.
-// Only return true if an element in the slice EXACTLY matches the string.
-// If testing for more than one string,
-//   return true if ANY of them match an element in the slice.
-func slcHas(slc []string, args ...string) bool {
-	for _, s := range slc {
-		for _, a := range args {
-			if s == a {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func main() {
