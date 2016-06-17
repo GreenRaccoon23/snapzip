@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"mime"
 	"os"
 	"path/filepath"
@@ -128,16 +127,6 @@ func main() {
 	wg.Wait()
 }
 
-func chkerr(err error) {
-	if err == nil {
-		return
-	}
-	if DoQuiet {
-		os.Exit(1)
-	}
-	log.Fatal(err)
-}
-
 // Concatenate strings.
 func concat(slc ...string) string {
 	b := bytes.NewBuffer(nil)
@@ -153,7 +142,9 @@ func concat(slc ...string) string {
 func analyze(filename string) error {
 
 	file, err := os.Open(filename)
-	chkerr(err)
+	if err != nil {
+		return err
+	}
 	defer func(f *os.File) { f.Close() }(file)
 
 	switch {
@@ -162,7 +153,9 @@ func analyze(filename string) error {
 	case isSz(file):
 		// Uncompress it.
 		uncompressed, err := unsnap(file)
-		chkerr(err)
+		if err != nil {
+			return err
+		}
 
 		// If the uncompressed file is a tar archive, untar it.
 		if !isTar(uncompressed) {
@@ -174,7 +167,9 @@ func analyze(filename string) error {
 		}()
 
 		err = untar(uncompressed)
-		chkerr(err)
+		if err != nil {
+			return err
+		}
 		return nil
 
 	// If the file is a directory, tar it before compressing it.
@@ -183,7 +178,9 @@ func analyze(filename string) error {
 	case isDir(file):
 		// Tar it.
 		file, err = tarDir(file)
-		chkerr(err)
+		if err != nil {
+			return err
+		}
 		// Remove to close and remove the temporary tar archive.
 		defer func() {
 			file.Close()
@@ -197,7 +194,9 @@ func analyze(filename string) error {
 	default:
 		// Compress it.
 		_, err := snap(file)
-		chkerr(err)
+		if err != nil {
+			return err
+		}
 		break
 	}
 
@@ -436,7 +435,9 @@ func fmtSize(bytes uint64) string {
 // Decompress a snappy archive.
 func unsnap(src *os.File) (dst *os.File, err error) {
 	srcInfo, err := src.Stat()
-	chkerr(err)
+	if err != nil {
+		return
+	}
 	srcName := srcInfo.Name()
 
 	// Make sure existing files are not overwritten.
@@ -447,7 +448,9 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
-	chkerr(err)
+	if err != nil {
+		return
+	}
 	// Remember to re-open the uncompressed file after it has been written.
 	defer func() {
 		if err == nil {
@@ -465,7 +468,6 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	defer print()
 	_, err = io.Copy(dst, szr)
-	chkerr(err)
 	return
 }
 
@@ -664,7 +666,9 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Get file info.
 	srcInfo, err := src.Stat()
-	chkerr(err)
+	if err != nil {
+		return
+	}
 	srcTotal := uint64(srcInfo.Size())
 	srcName := src.Name()
 
@@ -675,7 +679,9 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Create the destination file.
 	dst, err = create(dstName, srcInfo.Mode())
-	chkerr(err)
+	if err != nil {
+		return
+	}
 
 	// Set up a *passthru writer in order to print progress.
 	pt := &passthru{
@@ -692,7 +698,9 @@ func snap(src *os.File) (dst *os.File, err error) {
 	_, err = snapCopy(sz, src)
 	// _, err = io.Copy(sz, src)
 	print()
-	chkerr(err)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -763,7 +771,6 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 			return
 		}
 		dst, err = os.Open(dst.Name())
-		chkerr(err)
 	}()
 
 	// Get file info for the source directory.
