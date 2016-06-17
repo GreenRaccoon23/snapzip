@@ -20,34 +20,39 @@ import (
 )
 
 var (
-	doBring         bool
-	doSingleArchive bool
-	doQuiet         bool
-	dstArchive      string
-	trgtFiles       []string
+	DoQuiet bool
+	Files   []string
+	// doBring         bool
+	// doSingleArchive bool
+	// dstArchive      string
 )
 
 func init() {
-	chkHelp()
-	flags()
+	if helpRequested() {
+		printHelp()
+		os.Exit(0)
+	}
+	setGlobalVars()
 }
 
 // Check whether the user requested help.
-func chkHelp() {
-	if len(os.Args) < 2 {
-		return
+func helpRequested() bool {
+
+	if tooFewArgs := (len(os.Args) < 2); tooFewArgs {
+		return true
 	}
 
 	switch os.Args[1] {
 	case "-h", "h", "help", "--help", "-H", "H", "HELP", "--HELP", "-help", "--h", "--H":
-		help(0)
+		return true
 	}
+
+	return false
 
 }
 
 // Print help and exit with a status code.
-func help(status int) {
-	defer os.Exit(status)
+func printHelp() {
 	fmt.Printf(
 		"%s\n",
 		`snapzip
@@ -65,32 +70,27 @@ Notes:
 }
 
 // Parse user arguments and modify global variables accordingly.
-func flags() {
-	// Program requires at least one user argument.
-	// Print help and exit with status 1 if none have been received.
-	if len(os.Args) < 2 {
-		help(1)
-	}
+func setGlobalVars() {
 
 	// Parse commandline arguments.
 	//flag.StringVar(&dstArchive, "a", "", "")
-	flag.BoolVar(&doQuiet, "q", false, "")
+	flag.BoolVar(&DoQuiet, "q", false, "")
 	flag.Parse()
 
 	// Modify global variables based on commandline arguments.
-	trgtFiles = os.Args[1:]
-	if !doQuiet && dstArchive == "" {
-		return
-	}
+	Files = os.Args[1:]
+	// if !DoQuiet && dstArchive == "" {
+	// 	return
+	// }
 
-	if doQuiet {
-		bools := []string{"-q"}
-		trgtFiles = filter(trgtFiles, bools...)
+	if DoQuiet {
+		boolArgs := []string{"-q"}
+		Files = filter(Files, boolArgs...)
 	}
-	if dstArchive != "" {
-		doSingleArchive = true
-		trgtFiles = filter(trgtFiles, dstArchive)
-	}
+	// if dstArchive != "" {
+	// 	// doSingleArchive = true
+	// 	Files = filter(Files, dstArchive)
+	// }
 	return
 }
 
@@ -129,15 +129,15 @@ func main() {
 	*/
 
 	var wg sync.WaitGroup
-	lenTrgtFiles := len(trgtFiles)
+	lenTrgtFiles := len(Files)
 	wg.Add(lenTrgtFiles)
 
-	for _, f := range trgtFiles {
+	for _, f := range Files {
 		go func(f string) {
 			defer wg.Done()
 			//f = filepath.Clean(f)
 			err := analyze(f)
-			if err != nil && !doQuiet {
+			if err != nil && !DoQuiet {
 				print(err)
 			}
 		}(f)
@@ -148,7 +148,7 @@ func main() {
 
 // Pass to fmt.Println() unless quiet mode is active.
 func print(a ...interface{}) {
-	if doQuiet {
+	if DoQuiet {
 		return
 	}
 	fmt.Println(a...)
@@ -156,7 +156,7 @@ func print(a ...interface{}) {
 
 // Print a newline unless quiet mode is active.
 func println() {
-	if doQuiet {
+	if DoQuiet {
 		return
 	}
 	fmt.Println()
@@ -164,7 +164,7 @@ func println() {
 
 // Pass to fmt.Printf() unless quiet mode is active.
 func printf(format string, a ...interface{}) {
-	if doQuiet {
+	if DoQuiet {
 		return
 	}
 	fmt.Printf(format, a...)
@@ -173,7 +173,7 @@ func chkerr(err error) {
 	if err == nil {
 		return
 	}
-	if doQuiet {
+	if DoQuiet {
 		os.Exit(1)
 	}
 	log.Fatal(err)
@@ -368,7 +368,7 @@ type passthru struct {
 // NOTE: Print a new line after any commands which use this io.Reader.
 func (pt *passthru) Read(b []byte) (int, error) {
 	n, err := pt.Reader.Read(b)
-	if n <= 0 || doQuiet {
+	if n <= 0 || DoQuiet {
 		return n, err
 	}
 	pt.total += uint64(n)
@@ -404,7 +404,7 @@ func (pt *passthru) Read(b []byte) (int, error) {
 // NOTE: Print a new line after any commands which use this io.Writer.
 func (pt *passthru) Write(b []byte) (int, error) {
 	n, err := pt.Writer.Write(b)
-	if n <= 0 || doQuiet {
+	if n <= 0 || DoQuiet {
 		return n, err
 	}
 
@@ -595,7 +595,7 @@ func untar(file *os.File) error {
 		}
 
 		// Print progress.
-		if doQuiet || hdr.Size == int64(0) {
+		if DoQuiet || hdr.Size == int64(0) {
 			continue
 		}
 		progress = progress + uint64(hdr.Size)
@@ -818,7 +818,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	dstName := concat(baseName, ".tar")
 	genUnusedFilename(&dstName)
 
-	if !doQuiet {
+	if !DoQuiet {
 		fmt.Println(concat(dirName, "  >  ", dstName))
 		defer fmt.Println()
 	}
@@ -846,7 +846,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	// Add a header to the tar archive for each file encountered.
 	var total, progress int
 	var start time.Time
-	if !doQuiet {
+	if !DoQuiet {
 		total = dirSize(dirName)
 	}
 	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
@@ -871,7 +871,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 		}
 
 		// Skip printing progress if user requested it.
-		if doQuiet {
+		if DoQuiet {
 			return nil
 		}
 
