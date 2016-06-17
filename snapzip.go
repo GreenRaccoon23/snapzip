@@ -26,6 +26,8 @@ var (
 	// doBring         bool
 	// doSingleArchive bool
 	// dstArchive      string
+
+	print = fmt.Println
 )
 
 func init() {
@@ -87,12 +89,18 @@ func setGlobalVars() {
 	if DoQuiet {
 		boolArgs := []string{"-q"}
 		Files = slices.Filter(Files, boolArgs...)
+		print = printNoop
 	}
 	// if dstArchive != "" {
 	// 	// doSingleArchive = true
 	// 	Files = slices.Filter(Files, dstArchive)
 	// }
 	return
+}
+
+// Empty print func for when 'DoQuiet' is set.
+func printNoop(x ...interface{}) (int, error) {
+	return 0, nil
 }
 
 func main() {
@@ -120,29 +128,6 @@ func main() {
 	wg.Wait()
 }
 
-// Pass to fmt.Println() unless quiet mode is active.
-func print(a ...interface{}) {
-	if DoQuiet {
-		return
-	}
-	fmt.Println(a...)
-}
-
-// Print a newline unless quiet mode is active.
-func println() {
-	if DoQuiet {
-		return
-	}
-	fmt.Println()
-}
-
-// Pass to fmt.Printf() unless quiet mode is active.
-func printf(format string, a ...interface{}) {
-	if DoQuiet {
-		return
-	}
-	fmt.Printf(format, a...)
-}
 func chkerr(err error) {
 	if err == nil {
 		return
@@ -166,6 +151,7 @@ func concat(slc ...string) string {
 // Determine whether a file should be compressed, uncompressed, or
 //   added to a tar archive and then compressed.
 func analyze(filename string) error {
+
 	file, err := os.Open(filename)
 	chkerr(err)
 	defer func(f *os.File) { f.Close() }(file)
@@ -186,6 +172,7 @@ func analyze(filename string) error {
 		defer func() {
 			os.Remove(uncompressed.Name())
 		}()
+
 		err = untar(uncompressed)
 		chkerr(err)
 		return nil
@@ -476,7 +463,7 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 	szr := snappy.NewReader(pt)
 	defer szr.Reset(nil)
 
-	defer println()
+	defer print()
 	_, err = io.Copy(dst, szr)
 	chkerr(err)
 	return
@@ -514,7 +501,7 @@ func untar(file *os.File) error {
 
 	// Extract the archive.
 	print(concat(name, "  >  ", dstName))
-	defer println()
+	defer print()
 	var progress uint64
 	var outputLength int
 	var start time.Time
@@ -704,7 +691,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 	// Write the source file's contents to the new snappy file.
 	_, err = snapCopy(sz, src)
 	// _, err = io.Copy(sz, src)
-	println()
+	print()
 	chkerr(err)
 	return
 }
