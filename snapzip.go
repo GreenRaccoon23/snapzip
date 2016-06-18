@@ -344,10 +344,13 @@ func exists(filename string) bool {
 type passthru struct {
 	io.Reader
 	io.Writer
-	nTransferred   uint64 // Total # of bytes transferred
-	nExpected      uint64 // Expected length
-	currentPercent float64
-	outputLength   int
+
+	nTransferred uint64 // Total # of bytes transferred
+	nExpected    uint64 // Expected length
+
+	percentTransferred float64
+
+	outputLength int
 }
 
 // Write 'overrides' the underlying io.Reader's Read method.
@@ -361,14 +364,8 @@ func (pt *passthru) Read(b []byte) (int, error) {
 		return nRead, err
 	}
 
-	pt.nTransferred += uint64(nRead)
-
-	percent := float64(pt.nTransferred) / float64(pt.nExpected) * float64(100)
-	percentRounded := int(percent)
-
-	progressSinceLastCall := percent - pt.currentPercent
-	tooSoonToPrint := progressSinceLastCall < 2
-	if tooSoonToPrint && percentRounded < 99 {
+	percent, shouldPrint := pt.updatePercentTransferred(nRead)
+	if !shouldPrint {
 		return nRead, err
 	}
 
@@ -377,34 +374,59 @@ func (pt *passthru) Read(b []byte) (int, error) {
 
 	output := fmt.Sprintf(
 		"  %v%%   %v / %v",
-		percentRounded, labelSoFar, labelTotal,
+		percent, labelSoFar, labelTotal,
 	)
 
-	pt.clearPreviousOutput(output)
-
-	fmt.Printf("\r%v", output)
-	pt.currentPercent = percent
+	pt.print(output)
 
 	return nRead, err
 }
 
-func (pt *passthru) clearPreviousOutput(output string) {
+func (pt *passthru) updatePercentTransferred(nTransferred int) (percentRounded int, shouldPrint bool) {
 
-	outputLength := len(output)
+	pt.nTransferred += uint64(nTransferred)
+
+	percentTransferred := float64(pt.nTransferred) / float64(pt.nExpected) * float64(100)
+	percentRounded = int(percentTransferred)
+
+	percentSinceLastPrint := percentTransferred - pt.percentTransferred
+	tooSoonToPrint := percentSinceLastPrint < 2
+	shouldPrint = (!tooSoonToPrint || percentRounded > 99)
+
+	if !shouldPrint {
+		return
+	}
+
+	pt.percentTransferred = percentTransferred
+
+	return
+}
+
+func (pt *passthru) print(output string) {
+
+	pt.updateOutputLength(output)
+	pt.clearPreviousOutput()
+
+	fmt.Printf("\r%v", output)
+}
+
+func (pt *passthru) updateOutputLength(nextOutput string) {
+
+	nextOutputLength := len(nextOutput)
 	prevOutputLength := pt.outputLength
 
-	pt.outputLength = greaterOf(outputLength, prevOutputLength)
+	pt.outputLength = greaterOf(nextOutputLength, prevOutputLength)
+}
 
-	fmt.Printf("\r%v", strings.Repeat(" ", pt.outputLength))
+func (pt *passthru) clearPreviousOutput() {
+	emptySpace := strings.Repeat(" ", pt.outputLength)
+	fmt.Printf("\r%v", emptySpace)
 }
 
 func greaterOf(x int, y int) int {
 	greater := math.Max(float64(x), float64(y))
 	return int(greater)
 }
-
-// func (pt *passthru) getReadOutput(b []byte) (int, error) {
-// }
 
 // Write 'overrides' the underlying io.Writer's Write method.
 // This is the one that will be called by io.Copy(). We simply
@@ -417,15 +439,9 @@ func (pt *passthru) Write(b []byte) (int, error) {
 		return nWritten, err
 	}
 
-	pt.nTransferred += uint64(nWritten)
-
-	percent := float64(pt.nTransferred) / float64(pt.nExpected) * float64(100)
-	percentRounded := int(percent)
-
-	progressSinceLastCall := percent - pt.currentPercent
-	tooSoonToPrint := progressSinceLastCall < 2
-	if tooSoonToPrint && percentRounded < 99 {
-		return nWritten, err
+	percent, shouldPrint := pt.updatePercentTransferred(nWritten)
+	if !shouldPrint {
+		return nRead, err
 	}
 
 	labelSoFar := sizeLabel(pt.nTransferred)
@@ -434,12 +450,10 @@ func (pt *passthru) Write(b []byte) (int, error) {
 
 	output := fmt.Sprintf(
 		"  %v%%   %v / %v = %v",
-		percentRounded, labelSoFar, labelTotal, ratio,
+		percent, labelSoFar, labelTotal, ratio,
 	)
 
-	pt.clearPreviousOutput(output)
-	fmt.Printf("\r%v", output)
-	pt.currentPercent = percent
+	pt.print(output)
 
 	return nWritten, err
 }
