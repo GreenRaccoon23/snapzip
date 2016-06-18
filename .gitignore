@@ -1,6 +1,7 @@
 test/**
 *.swp
-long-file
+short-file*
+long-file*
 long-file2
 tmp/**
 snapzip
