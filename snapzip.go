@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"os"
 	"path/filepath"
@@ -343,10 +344,10 @@ func exists(filename string) bool {
 type passthru struct {
 	io.Reader
 	io.Writer
-	total        uint64 // Total # of bytes transferred
-	length       uint64 // Expected length
-	progress     float64
-	outputLength int
+	nTransferred   uint64 // Total # of bytes transferred
+	nExpected      uint64 // Expected length
+	currentPercent float64
+	outputLength   int
 }
 
 // Write 'overrides' the underlying io.Reader's Read method.
@@ -354,72 +355,93 @@ type passthru struct {
 // use it to keep track of byte counts and then forward the call.
 // NOTE: Print a new line after any commands which use this io.Reader.
 func (pt *passthru) Read(b []byte) (int, error) {
-	n, err := pt.Reader.Read(b)
-	if n <= 0 || DoQuiet {
-		return n, err
-	}
-	pt.total += uint64(n)
 
-	percentage := float64(pt.total) / float64(pt.length) * float64(100)
-	percent := int(percentage)
-	if percentage-pt.progress < 1 && percent < 99 {
-		return n, err
+	nRead, err := pt.Reader.Read(b)
+	if eof := (nRead <= 0); eof || DoQuiet {
+		return nRead, err
 	}
 
-	total := sizeLabel(pt.total)
-	goal := sizeLabel(pt.length)
+	pt.nTransferred += uint64(nRead)
+
+	percent := float64(pt.nTransferred) / float64(pt.nExpected) * float64(100)
+	percentRounded := int(percent)
+
+	progressSinceLastCall := percent - pt.currentPercent
+	tooSoonToPrint := progressSinceLastCall < 2
+	if tooSoonToPrint && percentRounded < 99 {
+		return nRead, err
+	}
+
+	labelSoFar := sizeLabel(pt.nTransferred)
+	labelTotal := sizeLabel(pt.nExpected)
 
 	output := fmt.Sprintf(
 		"  %v%%   %v / %v",
-		percent, total, goal,
+		percentRounded, labelSoFar, labelTotal,
 	)
+
+	pt.clearPreviousOutput(output)
+
+	fmt.Printf("\r%v", output)
+	pt.currentPercent = percent
+
+	return nRead, err
+}
+
+func (pt *passthru) clearPreviousOutput(output string) {
+
 	outputLength := len(output)
-	if outputLength > pt.outputLength {
-		pt.outputLength = outputLength
-	}
+	prevOutputLength := pt.outputLength
+
+	pt.outputLength = greaterOf(outputLength, prevOutputLength)
 
 	fmt.Printf("\r%v", strings.Repeat(" ", pt.outputLength))
-	fmt.Printf("\r%v", output)
-	pt.progress = percentage
-
-	return n, err
 }
+
+func greaterOf(x int, y int) int {
+	greater := math.Max(float64(x), float64(y))
+	return int(greater)
+}
+
+// func (pt *passthru) getReadOutput(b []byte) (int, error) {
+// }
 
 // Write 'overrides' the underlying io.Writer's Write method.
 // This is the one that will be called by io.Copy(). We simply
 // use it to keep track of byte counts and then forward the call.
 // NOTE: Print a new line after any commands which use this io.Writer.
 func (pt *passthru) Write(b []byte) (int, error) {
-	n, err := pt.Writer.Write(b)
-	if n <= 0 || DoQuiet {
-		return n, err
+
+	nWritten, err := pt.Writer.Write(b)
+	if eof := (nWritten <= 0); eof || DoQuiet {
+		return nWritten, err
 	}
 
-	pt.total += uint64(n)
-	percentage := float64(pt.total) / float64(pt.length) * float64(100)
-	percent := int(percentage)
-	if percentage-pt.progress < 1 && percent < 99 {
-		return n, err
+	pt.nTransferred += uint64(nWritten)
+
+	percent := float64(pt.nTransferred) / float64(pt.nExpected) * float64(100)
+	percentRounded := int(percent)
+
+	progressSinceLastCall := percent - pt.currentPercent
+	tooSoonToPrint := progressSinceLastCall < 2
+	if tooSoonToPrint && percentRounded < 99 {
+		return nWritten, err
 	}
 
-	total := sizeLabel(pt.total)
-	goal := sizeLabel(pt.length)
-	ratio := fmt.Sprintf("%.3f", float64(pt.total)/float64(pt.length))
+	labelSoFar := sizeLabel(pt.nTransferred)
+	labelTotal := sizeLabel(pt.nExpected)
+	ratio := fmt.Sprintf("%.3f", float64(pt.nTransferred)/float64(pt.nExpected))
 
 	output := fmt.Sprintf(
 		"  %v%%   %v / %v = %v",
-		percent, total, goal, ratio,
+		percentRounded, labelSoFar, labelTotal, ratio,
 	)
 
-	outputLength := len(output)
-	if outputLength > pt.outputLength {
-		pt.outputLength = outputLength
-	}
-	fmt.Printf("\r%v", strings.Repeat(" ", pt.outputLength))
+	pt.clearPreviousOutput(output)
 	fmt.Printf("\r%v", output)
-	pt.progress = percentage
+	pt.currentPercent = percent
 
-	return n, err
+	return nWritten, err
 }
 
 // Slight variation of bytefmt.ByteSize() from:
@@ -486,8 +508,8 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 	}()
 
 	pt := &passthru{
-		Reader: src,
-		length: uint64(srcInfo.Size()),
+		Reader:    src,
+		nExpected: uint64(srcInfo.Size()),
 	}
 	defer func() { pt.Reader = nil }()
 	szr := snappy.NewReader(pt)
@@ -712,8 +734,8 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Set up a *passthru writer in order to print progress.
 	pt := &passthru{
-		Writer: dst,
-		length: uint64(srcTotal),
+		Writer:    dst,
+		nExpected: uint64(srcTotal),
 	}
 	defer func() { pt.Writer = nil }()
 
