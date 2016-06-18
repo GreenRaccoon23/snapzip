@@ -151,53 +151,18 @@ func analyze(filename string) error {
 
 	// If the file is a snappy file, uncompress it.
 	case isSz(file):
-		// Uncompress it.
-		uncompressed, err := unsnap(file)
-		if err != nil {
-			return err
-		}
-
-		// If the uncompressed file is a tar archive, untar it.
-		if !isTar(uncompressed) {
-			return nil
-		}
-		// Remember to remove the uncompressed tar archive.
-		defer func() {
-			os.Remove(uncompressed.Name())
-		}()
-
-		err = untar(uncompressed)
-		if err != nil {
-			return err
-		}
-		return nil
+		return unsnapAndUntar(file)
 
 	// If the file is a directory, tar it before compressing it.
 	// (Simultaneously compressing and tarring the file
 	//   results in a much lower compression ratio.)
 	case isDir(file):
-		// Tar it.
-		file, err = tarDir(file)
-		if err != nil {
-			return err
-		}
-		// Remove to close and remove the temporary tar archive.
-		defer func() {
-			file.Close()
-			if err == nil {
-				os.Remove(file.Name())
-			}
-		}()
-		fallthrough
+		return tarAndSnap(file)
 
 	// If the file is any other type, compress it.
 	default:
-		// Compress it.
 		_, err := snap(file)
-		if err != nil {
-			return err
-		}
-		break
+		return err
 	}
 
 	return nil
@@ -245,6 +210,54 @@ func isTar(file *os.File) bool {
 		}
 	}
 	return true
+}
+
+// Uncompress a file.
+// Then, if the uncompressed file is a tar archive, extract it as well.
+func unsnapAndUntar(file *os.File) error {
+
+	// Uncompress it.
+	uncompressed, err := unsnap(file)
+	if err != nil {
+		return err
+	}
+
+	// If the uncompressed file is not a tar archive, don't try to untar it.
+	if !isTar(uncompressed) {
+		return nil
+	}
+
+	// Remember to remove the uncompressed tar archive.
+	defer func() {
+		os.Remove(uncompressed.Name())
+	}()
+
+	return untar(uncompressed)
+}
+
+// Make a temporary tar archive of a file and then compress it.
+// (Simultaneously compressing and tarring the file
+//  results in a much lower compression ratio.)
+// Remove the temporary tar archive if no errors occur.
+func tarAndSnap(file *os.File) error {
+
+	// Tar it.
+	tmpArchive, err := tarDir(file)
+	if err != nil {
+		return err
+	}
+
+	// Remember to close and remove the temporary tar archive.
+	defer tmpArchive.Close()
+	defer func() {
+		if err == nil {
+			os.Remove(tmpArchive.Name())
+		}
+	}()
+
+	// Compress it.
+	_, err = snap(tmpArchive)
+	return err
 }
 
 // Create a file if it doesn't exist. Otherwise, just open it.
