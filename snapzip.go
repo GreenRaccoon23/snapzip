@@ -82,15 +82,21 @@ func setGlobalVars() {
 
 	// Modify global variables based on commandline arguments.
 	Files = os.Args[1:]
+
 	// if !DoQuiet && dstArchive == "" {
 	//  return
 	// }
+
+	if len(Files) > 1 {
+		DoQuiet = true
+	}
 
 	if DoQuiet {
 		boolArgs := []string{"-q"}
 		Files = slices.Filter(Files, boolArgs...)
 		print = printNoop
 	}
+
 	// if dstArchive != "" {
 	//  // doSingleArchive = true
 	//  Files = slices.Filter(Files, dstArchive)
@@ -104,11 +110,9 @@ func printNoop(x ...interface{}) (int, error) {
 }
 
 func main() {
-	/*
-	   if doSingleArchive {
 
-	   }
-	*/
+	// if doSingleArchive {
+	// }
 
 	editFiles()
 }
@@ -131,6 +135,7 @@ func editFiles() {
 	}
 
 	wg.Wait()
+	close(chanErr)
 
 	for err := range chanErr {
 		if err != nil {
