@@ -82,7 +82,7 @@ func setGlobalVars() {
 	// Modify global variables based on commandline arguments.
 	Files = os.Args[1:]
 	// if !DoQuiet && dstArchive == "" {
-	// 	return
+	//  return
 	// }
 
 	if DoQuiet {
@@ -91,8 +91,8 @@ func setGlobalVars() {
 		print = printNoop
 	}
 	// if dstArchive != "" {
-	// 	// doSingleArchive = true
-	// 	Files = slices.Filter(Files, dstArchive)
+	//  // doSingleArchive = true
+	//  Files = slices.Filter(Files, dstArchive)
 	// }
 	return
 }
@@ -104,9 +104,9 @@ func printNoop(x ...interface{}) (int, error) {
 
 func main() {
 	/*
-		if doSingleArchive {
+	   if doSingleArchive {
 
-		}
+	   }
 	*/
 
 	var wg sync.WaitGroup
@@ -727,42 +727,44 @@ const SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN = 65536
 //   as long as the source Reader is an *os.File
 //   and the destination Writer is a *snappy.Writer.
 func snapCopy(sz *snappy.Writer, src *os.File) (totalWritten int64, err error) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	wg.Done()
+	totalWritten, err = io.Copy(sz, src)
+	return
+	// var wg sync.WaitGroup
+	// wg.Add(1)
+	// wg.Done()
 
-	for {
-		if err != nil {
-			break
-		}
+	// for {
+	//     if err != nil {
+	//         break
+	//     }
 
-		chunk := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
-		// Read byte chunk.
-		nRead, _ := src.Read(chunk)
-		// Stop if nothing was read.
-		if nRead == 0 {
-			break
-		}
+	//     chunk := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
+	//     // Read byte chunk.
+	//     nRead, _ := src.Read(chunk)
+	//     // Stop if nothing was read.
+	//     if nRead == 0 {
+	//         break
+	//     }
 
-		wg.Wait()
+	//     wg.Wait()
 
-		// Write byte chunk.
-		wg.Add(1)
-		go func(chunk []byte) {
-			defer wg.Done()
-			var nWritten int
-			nWritten, err = sz.Write(chunk)
-			totalWritten += int64(nWritten)
-		}(chunk)
+	//     // Write byte chunk.
+	//     wg.Add(1)
+	//     go func(chunk []byte) {
+	//         defer wg.Done()
+	//         var nWritten int
+	//         nWritten, err = sz.Write(chunk)
+	//         totalWritten += int64(nWritten)
+	//     }(chunk)
 
-		// Stop if the 'src' Reader did not read the maxiumum amount of bytes,
-		//   i.e., it reached EOF.
-		if nRead < SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN {
-			break
-		}
-	}
+	//     // Stop if the 'src' Reader did not read the maxiumum amount of bytes,
+	//     //   i.e., it reached EOF.
+	//     if nRead < SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN {
+	//         break
+	//     }
+	// }
 
-	wg.Wait()
+	// wg.Wait()
 
 	return
 }
