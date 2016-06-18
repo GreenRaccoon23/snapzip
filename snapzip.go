@@ -197,32 +197,34 @@ func isDir(file *os.File) bool {
 // Check a file's contents for a snappy file signature.
 func isSz(file *os.File) bool {
 
-	total := 10
+	snappySignature := []byte{255, 6, 0, 0, 115, 78, 97, 80, 112, 89}
 	offset := int64(0)
 
-	chunk := make([]byte, total)
+	lenSignature := len(snappySignature)
+	chunk := make([]byte, lenSignature)
+
 	nRead, _ := file.ReadAt(chunk, offset)
-	if nRead < total {
+	if nRead < lenSignature {
 		return false
 	}
 
-	snappySignature := []byte{255, 6, 0, 0, 115, 78, 97, 80, 112, 89}
 	return bytes.Equal(chunk, snappySignature)
 }
 
 // Check a file's contents for a tar file signature.
 func isTar(file *os.File) bool {
 
-	total := 5
+	tarSignature := []byte{117, 115, 116, 97, 114}
 	offset := int64(257)
 
-	chunk := make([]byte, total)
+	lenSignature := len(tarSignature)
+	chunk := make([]byte, lenSignature)
+
 	nRead, _ := file.ReadAt(chunk, offset)
-	if nRead < total {
+	if nRead < lenSignature {
 		return false
 	}
 
-	tarSignature := []byte{117, 115, 116, 97, 114}
 	return bytes.Equal(chunk, tarSignature)
 }
 
