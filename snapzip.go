@@ -129,7 +129,7 @@ func main() {
 
 // Concatenate strings.
 func concat(slc ...string) string {
-	b := bytes.NewBuffer(nil)
+	var b bytes.Buffer
 	defer b.Reset()
 	for _, s := range slc {
 		b.WriteString(s)
