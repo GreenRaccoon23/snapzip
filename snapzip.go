@@ -110,22 +110,33 @@ func main() {
 	   }
 	*/
 
-	var wg sync.WaitGroup
-	lenTrgtFiles := len(Files)
-	wg.Add(lenTrgtFiles)
+	editFiles()
+}
 
-	for _, f := range Files {
-		go func(f string) {
+func editFiles() {
+
+	lenFiles := len(Files)
+
+	var wg sync.WaitGroup
+	wg.Add(lenFiles)
+
+	chanErr := make(chan error, lenFiles)
+
+	for _, path := range Files {
+		go func(path string) {
 			defer wg.Done()
-			//f = filepath.Clean(f)
-			err := analyze(f)
-			if err != nil && !DoQuiet {
-				print(err)
-			}
-		}(f)
+			//path = filepath.Clean(path)
+			chanErr <- analyze(path)
+		}(path)
 	}
 
 	wg.Wait()
+
+	for err := range chanErr {
+		if err != nil {
+			print(err)
+		}
+	}
 }
 
 // Concatenate strings.
@@ -140,13 +151,13 @@ func concat(slc ...string) string {
 
 // Determine whether a file should be compressed, uncompressed, or
 //   added to a tar archive and then compressed.
-func analyze(filename string) error {
+func analyze(path string) error {
 
-	file, err := os.Open(filename)
+	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	defer func(f *os.File) { f.Close() }(file)
+	defer file.Close()
 
 	switch {
 
@@ -441,7 +452,7 @@ func (pt *passthru) Write(b []byte) (int, error) {
 
 	percent, shouldPrint := pt.updatePercentTransferred(nWritten)
 	if !shouldPrint {
-		return nRead, err
+		return nWritten, err
 	}
 
 	labelSoFar := sizeLabel(pt.nTransferred)
