@@ -179,37 +179,34 @@ func isDir(file *os.File) bool {
 
 // Check a file's contents for a snappy file signature.
 func isSz(file *os.File) bool {
+
 	total := 10
-	bytes := make([]byte, total)
-	n, _ := file.ReadAt(bytes, 0)
-	if n < total {
+	offset := int64(0)
+
+	chunk := make([]byte, total)
+	nRead, _ := file.ReadAt(chunk, offset)
+	if nRead < total {
 		return false
 	}
 
-	szSig := []byte{255, 6, 0, 0, 115, 78, 97, 80, 112, 89}
-	for i, b := range bytes {
-		if b != szSig[i] {
-			return false
-		}
-	}
-	return true
+	snappySignature := []byte{255, 6, 0, 0, 115, 78, 97, 80, 112, 89}
+	return bytes.Equal(chunk, snappySignature)
 }
 
 // Check a file's contents for a tar file signature.
 func isTar(file *os.File) bool {
-	bytes := make([]byte, 5)
-	n, _ := file.ReadAt(bytes, 257)
-	if n < 5 {
+
+	total := 5
+	offset := int64(257)
+
+	chunk := make([]byte, total)
+	nRead, _ := file.ReadAt(chunk, offset)
+	if nRead < total {
 		return false
 	}
 
-	tarSig := []byte{117, 115, 116, 97, 114}
-	for i, b := range bytes {
-		if b != tarSig[i] {
-			return false
-		}
-	}
-	return true
+	tarSignature := []byte{117, 115, 116, 97, 114}
+	return bytes.Equal(chunk, tarSignature)
 }
 
 // Uncompress a file.
@@ -262,7 +259,7 @@ func tarAndSnap(file *os.File) error {
 
 // Create a file if it doesn't exist. Otherwise, just open it.
 func create(filename string, mode os.FileMode) (*os.File, error) {
-	// genUnusedFilename(&filename)
+	// getUnusedFilename(&filename)
 	file, err := os.OpenFile(
 		filename,
 		os.O_RDWR|os.O_CREATE|os.O_APPEND,
@@ -272,10 +269,12 @@ func create(filename string, mode os.FileMode) (*os.File, error) {
 }
 
 // Modify a filename to one that has not been used by the system.
-func genUnusedFilename(filename *string) {
+func getUnusedFilename(filename *string) {
+
 	if !exists(*filename) {
 		return
 	}
+
 	base, ext := splitExt(*filename)
 	// Go's date of birth. :)
 	for i := 1; i < 20091110; i++ {
@@ -293,23 +292,38 @@ func genUnusedFilename(filename *string) {
 // Split the extension off a filename.
 // Return the basename and the extension.
 func splitExt(filename string) (base, ext string) {
+
 	base = filepath.Clean(filename)
+
 	for {
+
 		testext := filepath.Ext(base)
-		if testext == "" {
+
+		if !isExtension(testext) {
 			return
 		}
-		if mime.TypeByExtension(testext) == "" {
-			switch testext {
-			case ".tar", ".sz", ".tar.sz":
-				break
-			default:
-				return
-			}
-		}
+
 		ext = concat(testext, ext)
 		base = strings.TrimSuffix(base, testext)
 	}
+}
+
+func isExtension(ext string) bool {
+
+	if ext == "" {
+		return false
+	}
+
+	if recognizedByFS := (mime.TypeByExtension(ext) != ""); recognizedByFS {
+		return true
+	}
+
+	switch ext {
+	case ".tar", ".sz", ".tar.sz":
+		return true
+	}
+
+	return false
 }
 
 // Check whether a file exists.
@@ -352,8 +366,8 @@ func (pt *passthru) Read(b []byte) (int, error) {
 		return n, err
 	}
 
-	total := fmtSize(pt.total)
-	goal := fmtSize(pt.length)
+	total := sizeLabel(pt.total)
+	goal := sizeLabel(pt.length)
 
 	output := fmt.Sprintf(
 		"  %v%%   %v / %v",
@@ -388,8 +402,8 @@ func (pt *passthru) Write(b []byte) (int, error) {
 		return n, err
 	}
 
-	total := fmtSize(pt.total)
-	goal := fmtSize(pt.length)
+	total := sizeLabel(pt.total)
+	goal := sizeLabel(pt.length)
 	ratio := fmt.Sprintf("%.3f", float64(pt.total)/float64(pt.length))
 
 	output := fmt.Sprintf(
@@ -418,26 +432,26 @@ const (
 	TEBIBYTE = 1000 * GIBIBYTE
 )
 
-func fmtSize(bytes uint64) string {
+func sizeLabel(byteSize uint64) string {
 	unit := ""
-	value := float64(bytes)
+	value := float64(byteSize)
 
 	switch {
-	case bytes >= TEBIBYTE:
+	case byteSize >= TEBIBYTE:
 		unit = "TiB"
 		value = value / TEBIBYTE
-	case bytes >= GIBIBYTE:
+	case byteSize >= GIBIBYTE:
 		unit = "GiB"
 		value = value / GIBIBYTE
-	case bytes >= MEBIBYTE:
+	case byteSize >= MEBIBYTE:
 		unit = "MiB"
 		value = value / MEBIBYTE
-	case bytes >= KIBIBYTE:
+	case byteSize >= KIBIBYTE:
 		unit = "KiB"
 		value = value / KIBIBYTE
-	case bytes >= BYTE:
+	case byteSize >= BYTE:
 		unit = "Bytes"
-	case bytes == 0:
+	case byteSize == 0:
 		return "0"
 	}
 
@@ -456,7 +470,7 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 	// Make sure existing files are not overwritten.
 	dstName := strings.TrimSuffix(srcName, ".sz")
 
-	genUnusedFilename(&dstName)
+	getUnusedFilename(&dstName)
 	print(concat(srcName, "  >  ", dstName))
 
 	// Create the destination file.
@@ -497,7 +511,7 @@ func untar(file *os.File) error {
 
 	// Make sure existing files are not overwritten.
 	dstName := topDir
-	genUnusedFilename(&dstName)
+	getUnusedFilename(&dstName)
 
 	// Re-open the readers.
 	file, err = os.Open(file.Name())
@@ -535,7 +549,7 @@ func untar(file *os.File) error {
 		// Make sure existing files are not overwritten.
 		name := hdr.Name
 		name = strings.Replace(name, topDir, dstName, 1)
-		genUnusedFilename(&name)
+		getUnusedFilename(&name)
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
@@ -586,7 +600,7 @@ func untar(file *os.File) error {
 
 		output := fmt.Sprintf(
 			"  %v%%   %v / %v",
-			percent, fmtSize(progress), fmtSize(total),
+			percent, sizeLabel(progress), sizeLabel(total),
 		)
 		// Clear previous output.
 		if len(output) > outputLength {
@@ -687,7 +701,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(srcName, ".sz")
-	genUnusedFilename(&dstName)
+	getUnusedFilename(&dstName)
 	print(concat(srcName, "  >  ", dstName))
 
 	// Create the destination file.
@@ -769,7 +783,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
-	genUnusedFilename(&dstName)
+	getUnusedFilename(&dstName)
 
 	if !DoQuiet {
 		fmt.Println(concat(dirName, "  >  ", dstName))
