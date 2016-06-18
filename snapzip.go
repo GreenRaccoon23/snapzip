@@ -709,7 +709,6 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Write the source file's contents to the new snappy file.
 	_, err = snapCopy(sz, src)
-	// _, err = io.Copy(sz, src)
 	print()
 	if err != nil {
 		return
@@ -723,50 +722,12 @@ const SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN = 65536
 // Read data from a source file,
 //   compress the data,
 //   and write it to a *snappy.Writer destination file.
-// Serves as a makeshift snappy replacement for io.Copy
+// Serves as a makeshift snappy replacement for io.CopyBuffer
 //   as long as the source Reader is an *os.File
 //   and the destination Writer is a *snappy.Writer.
-func snapCopy(sz *snappy.Writer, src *os.File) (totalWritten int64, err error) {
-	totalWritten, err = io.Copy(sz, src)
-	return
-	// var wg sync.WaitGroup
-	// wg.Add(1)
-	// wg.Done()
-
-	// for {
-	//     if err != nil {
-	//         break
-	//     }
-
-	//     chunk := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
-	//     // Read byte chunk.
-	//     nRead, _ := src.Read(chunk)
-	//     // Stop if nothing was read.
-	//     if nRead == 0 {
-	//         break
-	//     }
-
-	//     wg.Wait()
-
-	//     // Write byte chunk.
-	//     wg.Add(1)
-	//     go func(chunk []byte) {
-	//         defer wg.Done()
-	//         var nWritten int
-	//         nWritten, err = sz.Write(chunk)
-	//         totalWritten += int64(nWritten)
-	//     }(chunk)
-
-	//     // Stop if the 'src' Reader did not read the maxiumum amount of bytes,
-	//     //   i.e., it reached EOF.
-	//     if nRead < SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN {
-	//         break
-	//     }
-	// }
-
-	// wg.Wait()
-
-	return
+func snapCopy(sz *snappy.Writer, src *os.File) (int64, error) {
+	buf := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
+	return io.CopyBuffer(sz, src, buf)
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
