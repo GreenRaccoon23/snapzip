@@ -722,12 +722,21 @@ const SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN = 65536
 // Read data from a source file,
 //   compress the data,
 //   and write it to a *snappy.Writer destination file.
-// Serves as a makeshift snappy replacement for io.CopyBuffer
+// Serves as a makeshift snappy replacement for io.Copy
 //   as long as the source Reader is an *os.File
 //   and the destination Writer is a *snappy.Writer.
 func snapCopy(sz *snappy.Writer, src *os.File) (int64, error) {
+
 	buf := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
 	return io.CopyBuffer(sz, src, buf)
+
+	// Slow and dangerous. Kept for testing purposes.
+	// srcContents, err := ioutil.ReadAll(src)
+	// if err != nil {
+	// 	return
+	// }
+	// totalWritten, err = sz.Write(srcContents)
+	// return int64(totalWritten), err
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
