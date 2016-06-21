@@ -476,6 +476,17 @@ func (pt *passthru) Write(b []byte) (int, error) {
 	return nWritten, err
 }
 
+func sizeLabel(byteSize uint64) string {
+
+	value, unit := bytesToSymbol(float64(byteSize))
+	if tooSmall := (unit == ""); tooSmall {
+		return "0"
+	}
+
+	stringValue := fmt.Sprintf("%.1f", value)
+	return concat(stringValue, " ", unit)
+}
+
 // Slight variation of bytefmt.ByteSize() from:
 // https://github.com/pivotal-golang/bytefmt/blob/master/bytes.go
 const (
@@ -486,31 +497,20 @@ const (
 	TEBIBYTE = 1000 * GIBIBYTE
 )
 
-func sizeLabel(byteSize uint64) string {
-	unit := ""
-	value := float64(byteSize)
-
+func bytesToSymbol(b float64) (float64, string) {
 	switch {
-	case byteSize >= TEBIBYTE:
-		unit = "TiB"
-		value = value / TEBIBYTE
-	case byteSize >= GIBIBYTE:
-		unit = "GiB"
-		value = value / GIBIBYTE
-	case byteSize >= MEBIBYTE:
-		unit = "MiB"
-		value = value / MEBIBYTE
-	case byteSize >= KIBIBYTE:
-		unit = "KiB"
-		value = value / KIBIBYTE
-	case byteSize >= BYTE:
-		unit = "Bytes"
-	case byteSize == 0:
-		return "0"
+	case b >= TEBIBYTE:
+		return (b / TEBIBYTE), "TiB"
+	case b >= GIBIBYTE:
+		return (b / GIBIBYTE), "GiB"
+	case b >= MEBIBYTE:
+		return (b / MEBIBYTE), "MiB"
+	case b >= KIBIBYTE:
+		return (b / KIBIBYTE), "KiB"
+	case b >= BYTE:
+		return b, "Bytes"
 	}
-
-	stringValue := fmt.Sprintf("%.1f", value)
-	return concat(stringValue, " ", unit)
+	return b, ""
 }
 
 // Decompress a snappy archive.
