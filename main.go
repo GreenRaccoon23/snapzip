@@ -77,7 +77,7 @@ func editFiles() {
 		go func(path string) {
 			defer wg.Done()
 			//path = filepath.Clean(path)
-			chanErr <- analyze(path)
+			chanErr <- compressOrDecompress(path)
 		}(path)
 	}
 
@@ -93,7 +93,7 @@ func editFiles() {
 
 // Determine whether a file should be compressed, uncompressed, or
 //   added to a tar archive and then compressed.
-func analyze(path string) error {
+func compressOrDecompress(path string) error {
 
 	file, err := os.Open(path)
 	if err != nil {
