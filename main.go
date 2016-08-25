@@ -24,6 +24,22 @@ func init() {
 	setGlobalVars()
 }
 
+// Check whether the user requested help.
+func helpRequested() bool {
+
+	if tooFewArgs := (len(os.Args) < 2); tooFewArgs {
+		return true
+	}
+
+	switch os.Args[1] {
+	case "-h", "h", "help", "--help", "-H", "H", "HELP", "--HELP", "-help", "--h", "--H":
+		return true
+	}
+
+	return false
+
+}
+
 // Parse user arguments and modify global variables accordingly.
 func setGlobalVars() {
 
