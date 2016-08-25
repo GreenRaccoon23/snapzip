@@ -18,7 +18,7 @@ _capitalize() {
     echo "${1^}";
     # For zsh:
     # echo "${(C)1}";
-}
+};
 
 # Run `go build` and move the compiled binary to its destination folder.
 _build() {
@@ -60,7 +60,17 @@ _build() {
         echo "Failed to move '${PKG_NAME}' to '${dst}/'";
         exit "${statusCode}";
     fi;
-}
+};
+
+_buildAndroid() {
+    # _build "${OS_ANDROID}" "${ARCH_32_ARM}";
+    # _build "${OS_ANDROID}" "${ARCH_64_ARM}";
+    
+    ##############################
+    # THIS ONE ACTUALLY WORKS!!!!!
+    ##############################
+    GOMOBILE="${GOPATH}/pkg/gomobile" GOOS="android" GOARCH="arm" CC="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang" CXX="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang++" CGO_CFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_CPPFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_LDFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_ENABLED=1 GOARM=7 go build -pkgdir="$GOMOBILE/pkg_android_arm" -tags="" -x -ldflags="-extldflags=-pie" -buildmode="c-shared" -o "${GOPATH}/src/github.com/GreenRaccoon23/snapzip/Android_32/snapzip" "github.com/GreenRaccoon23/snapzip"
+};
 
 _main() {
     local os;
@@ -70,13 +80,7 @@ _main() {
         _build "${os}" "${ARCH_64}";
     done;
 
-    # _build "${OS_ANDROID}" "${ARCH_32_ARM}";
-    # _build "${OS_ANDROID}" "${ARCH_64_ARM}";
-    
-    ##############################
-    # THIS ONE ACTUALLY WORKS!!!!!
-    ##############################
-    GOMOBILE="${GOPATH}/pkg/gomobile" GOOS="android" GOARCH="arm" CC="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang" CXX="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang++" CGO_CFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_CPPFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_LDFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_ENABLED=1 GOARM=7 go build -pkgdir="$GOMOBILE/pkg_android_arm" -tags="" -x -ldflags="-extldflags=-pie" -buildmode="c-shared" -o "${GOPATH}/src/github.com/GreenRaccoon23/snapzip/Android_32/snapzip" "github.com/GreenRaccoon23/snapzip"
-}
+    _buildAndroid;
+};
 
 _main;
