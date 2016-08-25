@@ -69,7 +69,15 @@ _buildAndroid() {
     ##############################
     # THIS ONE ACTUALLY WORKS!!!!!
     ##############################
-    GOMOBILE="${GOPATH}/pkg/gomobile" GOOS="android" GOARCH="arm" CC="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang" CXX="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang++" CGO_CFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_CPPFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_LDFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_ENABLED=1 GOARM=7 go build -pkgdir="$GOMOBILE/pkg_android_arm" -tags="" -x -ldflags="-extldflags=-pie" -buildmode="c-shared" -o "${GOPATH}/src/github.com/GreenRaccoon23/snapzip/Android_32/snapzip" "github.com/GreenRaccoon23/snapzip"
+    GOMOBILE="${GOPATH}/pkg/gomobile" GOOS="android" GOARCH="arm" CC="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang" CXX="$GOMOBILE/android-ndk-r12b/arm/bin/arm-linux-androideabi-clang++" CGO_CFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_CPPFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_LDFLAGS="-target armv7a-none-linux-androideabi --sysroot $GOMOBILE/android-ndk-r12b/arm/sysroot" CGO_ENABLED=1 GOARM=7 go build -pkgdir="$GOMOBILE/pkg_android_arm" -tags="" -x -ldflags="-extldflags=-pie" -buildmode="c-shared" -o "${GOPATH}/src/github.com/GreenRaccoon23/snapzip/Android_32/snapzip" "github.com/GreenRaccoon23/snapzip";
+
+    if [ $? != 0 ]; then
+        local statusCode=$?;
+        echo "Build failed for '"${OS_ANDROID}"' on '${ARCH_32_ARM}' architecture";
+        exit "${statusCode}";
+    else
+        echo "Build successful for '"${OS_ANDROID}"' on '${ARCH_32_ARM}' architecture";
+    fi;
 };
 
 _main() {
