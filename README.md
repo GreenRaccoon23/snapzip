@@ -4,7 +4,7 @@
 ### Clone
     git clone https://github.com/GreenRaccoon23/snapzip.git
 ### Description
-Simple command-line program to compress/decompress files into Snappy archives.  
+Command-line program to compress/decompress files into Snappy archives.  
 Written in the language invented by Google, [Go](https://golang.org/), for the compression format invented by Google, [Snappy](https://github.com/google/snappy). [Snappy](https://github.com/google/snappy) aims to be ***FAST*** and stable while still maintaining reasonable compression.  
 ### Compatibility
 This program works on **Linux** and **Android**, but it does *NOT* work on **Windows**. It also works for *both* **32-bit** and **64-bit** processors (including arm). Although I haven't tested it, it should work on **Mac** as well.  
