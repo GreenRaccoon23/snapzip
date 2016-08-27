@@ -44,5 +44,5 @@ I uploaded this program for simplicity's and portability's sake (installation on
 [https://github.com/kubo/snzip](https://github.com/kubo/snzip)  
 The REAL credit for this program goes to those who've translated the Snappy library into Go:
 [https://github.com/golang/snappy/blob/master/AUTHORS](https://github.com/golang/snappy/blob/master/AUTHORS)
-Also, Docker's source code was a huge help:
+Also, Docker's source code was a huge help:  
 [https://github.com/docker/docker/blob/master/pkg/archive](https://github.com/docker/docker/blob/master/pkg/archive)
