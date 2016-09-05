@@ -303,7 +303,7 @@ func (ta *tarAppender) getHeader(path, name string) (*tar.Header, error) {
 
 	// If the file is a symlink, find its target.
 	var link string
-	if fi.Mode()&os.ModeSymlink != 0 {
+	if isSymlink := (fi.Mode()&os.ModeSymlink != 0); isSymlink {
 		if link, err = os.Readlink(path); err != nil {
 			return nil, err
 		}
@@ -317,7 +317,7 @@ func (ta *tarAppender) getHeader(path, name string) (*tar.Header, error) {
 
 	// Set the header name.
 	// If the file is a directory, add a trailing "/".
-	if fi.Mode()&os.ModeDir != 0 {
+	if isDir := (fi.Mode()&os.ModeDir != 0); isDir {
 		fmtDir(&name)
 	}
 	hdr.Name = name
@@ -336,9 +336,9 @@ func (ta *tarAppender) getHeader(path, name string) (*tar.Header, error) {
 	if fi.Mode().IsRegular() && hasHardLinks {
 		// If this file is NOT the first found hardlink to this inode,
 		//   set the previously found hardlink as its 'Linkname'.
-		if oldpath, ok := ta.hardLinks[inode]; ok {
+		if firstInode, ok := ta.hardLinks[inode]; ok {
 			hdr.Typeflag = tar.TypeLink
-			hdr.Linkname = oldpath
+			hdr.Linkname = firstInode
 			// Set size to 0 when not adding additional inodes.
 			//   Otherwise, the writer's math will not add up correctly.
 			hdr.Size = 0
