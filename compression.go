@@ -52,6 +52,9 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 func snap(src *os.File) (dst *os.File, err error) {
 	// Remember to re-open the destination file after compression.
 	defer func() {
+		if err != nil {
+			return
+		}
 		dst, err = os.Open(dst.Name())
 	}()
 
