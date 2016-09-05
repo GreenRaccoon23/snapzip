@@ -11,172 +11,6 @@ import (
 	"time"
 )
 
-// Extract a tar archive.
-func untar(file *os.File) error {
-	// Get the smallest directory name (top directory).
-	topDir, err := findTopDirInArchive(file)
-	if err != nil {
-		return err
-	}
-
-	// Strip off the trailing '/'.
-	topDir = topDir[0 : len(topDir)-1]
-
-	// Make sure existing files are not overwritten.
-	dstName := topDir
-	getUnusedFilename(&dstName)
-
-	// Re-open the readers.
-	file, err = os.Open(file.Name())
-	if err != nil {
-		return err
-	}
-	tr := tar.NewReader(file)
-
-	// Get file info.
-	fi, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	total := uint64(fi.Size())
-	name := fi.Name()
-
-	// Extract the archive.
-	print(concat(name, "  >  ", dstName))
-	defer print()
-	var progress uint64
-	var outputLength int
-	var start time.Time
-	for {
-		var hdr *tar.Header
-		hdr, err = tr.Next()
-
-		// Break if the end of the tar archive has been reached.
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			}
-			break
-		}
-
-		// Make sure existing files are not overwritten.
-		name := hdr.Name
-		name = strings.Replace(name, topDir, dstName, 1)
-		getUnusedFilename(&name)
-
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			// Extract a directory.
-			err = os.MkdirAll(name, os.FileMode(hdr.Mode))
-
-		case tar.TypeReg, tar.TypeRegA:
-			// Extract a regular file.
-			var w *os.File
-			w, err = create(name, os.FileMode(hdr.Mode))
-			if err != nil {
-				break
-			}
-			_, err = io.Copy(w, tr)
-			w.Close()
-
-		case tar.TypeLink:
-			// Extract a hard link.
-			err = os.Link(hdr.Linkname, name)
-
-		case tar.TypeSymlink:
-			// Extract a symlink.
-			err = os.Symlink(hdr.Linkname, name)
-
-		default:
-			// If the Typeflag is missing, the data is probably corrupt.
-			// Just skip to the next one anyway if this happens.
-			continue
-		}
-
-		if err != nil {
-			break
-		}
-
-		// Print progress.
-		if DoQuiet || hdr.Size == int64(0) {
-			continue
-		}
-		progress = progress + uint64(hdr.Size)
-		percent := int(float64(progress) / float64(total) * float64(100))
-
-		// Make sure progress isn't outputted more quickly
-		//   than the console can print.
-		if int(time.Since(start)) < 100000 && percent < 99 {
-			continue
-		}
-		start = time.Now()
-
-		output := fmt.Sprintf(
-			"  %v%%   %v / %v",
-			percent, sizeLabel(progress), sizeLabel(total),
-		)
-		// Clear previous output.
-		if len(output) > outputLength {
-			outputLength = len(output)
-		}
-		fmt.Printf("\r%v", strings.Repeat(" ", outputLength))
-		// Print new output.
-		fmt.Printf("\r%v", output)
-	}
-
-	if err != nil {
-		return fmt.Errorf("%v\nFailed to extract %v", err, name)
-	}
-	return nil
-}
-
-// Search a tar file for the top-level directory to be extracted.
-func findTopDirInArchive(file *os.File) (topDir string, err error) {
-	// Wrap a *tar.Reader around the *os.File.
-	tr := tar.NewReader(file)
-	defer func() {
-		tr = nil
-		file.Close()
-	}()
-
-	// Get the smallest directory name (top directory).
-	for {
-		var hdr *tar.Header
-		hdr, err = tr.Next()
-
-		// Break if the end of the tar archive has been reached.
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			}
-			break
-		}
-
-		// Set topDir to the very first header name.
-		// Most likely, this will be the name of the top directory anyway.
-		if topDir == "" {
-			topDir = hdr.Name
-		}
-
-		// Skip non-directories.
-		if hdr.Typeflag != tar.TypeDir {
-			continue
-		}
-
-		// The top directory is the shortest path and has the shortest name.
-		if len(hdr.Name) < len(topDir) {
-			topDir = hdr.Name
-		}
-	}
-
-	// If no names were found, the data is corrupt.
-	if topDir == "" {
-		err = fmt.Errorf("Unable to read %v. Data is corrupt.", file.Name())
-	}
-
-	return
-}
-
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 type tarAppender struct {
 	tarWriter *tar.Writer
@@ -511,4 +345,170 @@ func (ta *tarAppender) write(hdr *tar.Header, path string) error {
 	}
 
 	return tb.Flush()
+}
+
+// Extract a tar archive.
+func untar(file *os.File) error {
+	// Get the smallest directory name (top directory).
+	topDir, err := findTopDirInArchive(file)
+	if err != nil {
+		return err
+	}
+
+	// Strip off the trailing '/'.
+	topDir = topDir[0 : len(topDir)-1]
+
+	// Make sure existing files are not overwritten.
+	dstName := topDir
+	getUnusedFilename(&dstName)
+
+	// Re-open the readers.
+	file, err = os.Open(file.Name())
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(file)
+
+	// Get file info.
+	fi, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	total := uint64(fi.Size())
+	name := fi.Name()
+
+	// Extract the archive.
+	print(concat(name, "  >  ", dstName))
+	defer print()
+	var progress uint64
+	var outputLength int
+	var start time.Time
+	for {
+		var hdr *tar.Header
+		hdr, err = tr.Next()
+
+		// Break if the end of the tar archive has been reached.
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			break
+		}
+
+		// Make sure existing files are not overwritten.
+		name := hdr.Name
+		name = strings.Replace(name, topDir, dstName, 1)
+		getUnusedFilename(&name)
+
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			// Extract a directory.
+			err = os.MkdirAll(name, os.FileMode(hdr.Mode))
+
+		case tar.TypeReg, tar.TypeRegA:
+			// Extract a regular file.
+			var w *os.File
+			w, err = create(name, os.FileMode(hdr.Mode))
+			if err != nil {
+				break
+			}
+			_, err = io.Copy(w, tr)
+			w.Close()
+
+		case tar.TypeLink:
+			// Extract a hard link.
+			err = os.Link(hdr.Linkname, name)
+
+		case tar.TypeSymlink:
+			// Extract a symlink.
+			err = os.Symlink(hdr.Linkname, name)
+
+		default:
+			// If the Typeflag is missing, the data is probably corrupt.
+			// Just skip to the next one anyway if this happens.
+			continue
+		}
+
+		if err != nil {
+			break
+		}
+
+		// Print progress.
+		if DoQuiet || hdr.Size == int64(0) {
+			continue
+		}
+		progress = progress + uint64(hdr.Size)
+		percent := int(float64(progress) / float64(total) * float64(100))
+
+		// Make sure progress isn't outputted more quickly
+		//   than the console can print.
+		if int(time.Since(start)) < 100000 && percent < 99 {
+			continue
+		}
+		start = time.Now()
+
+		output := fmt.Sprintf(
+			"  %v%%   %v / %v",
+			percent, sizeLabel(progress), sizeLabel(total),
+		)
+		// Clear previous output.
+		if len(output) > outputLength {
+			outputLength = len(output)
+		}
+		fmt.Printf("\r%v", strings.Repeat(" ", outputLength))
+		// Print new output.
+		fmt.Printf("\r%v", output)
+	}
+
+	if err != nil {
+		return fmt.Errorf("%v\nFailed to extract %v", err, name)
+	}
+	return nil
+}
+
+// Search a tar file for the top-level directory to be extracted.
+func findTopDirInArchive(file *os.File) (topDir string, err error) {
+	// Wrap a *tar.Reader around the *os.File.
+	tr := tar.NewReader(file)
+	defer func() {
+		tr = nil
+		file.Close()
+	}()
+
+	// Get the smallest directory name (top directory).
+	for {
+		var hdr *tar.Header
+		hdr, err = tr.Next()
+
+		// Break if the end of the tar archive has been reached.
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			break
+		}
+
+		// Set topDir to the very first header name.
+		// Most likely, this will be the name of the top directory anyway.
+		if topDir == "" {
+			topDir = hdr.Name
+		}
+
+		// Skip non-directories.
+		if hdr.Typeflag != tar.TypeDir {
+			continue
+		}
+
+		// The top directory is the shortest path and has the shortest name.
+		if len(hdr.Name) < len(topDir) {
+			topDir = hdr.Name
+		}
+	}
+
+	// If no names were found, the data is corrupt.
+	if topDir == "" {
+		err = fmt.Errorf("Unable to read %v. Data is corrupt.", file.Name())
+	}
+
+	return
 }

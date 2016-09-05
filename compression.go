@@ -8,46 +8,6 @@ import (
 	"github.com/golang/snappy"
 )
 
-// Decompress a snappy archive.
-func unsnap(src *os.File) (dst *os.File, err error) {
-	srcInfo, err := src.Stat()
-	if err != nil {
-		return
-	}
-	srcName := srcInfo.Name()
-
-	// Make sure existing files are not overwritten.
-	dstName := strings.TrimSuffix(srcName, ".sz")
-
-	getUnusedFilename(&dstName)
-	print(concat(srcName, "  >  ", dstName))
-
-	// Create the destination file.
-	dst, err = create(dstName, srcInfo.Mode())
-	if err != nil {
-		return
-	}
-	// Remember to re-open the uncompressed file after it has been written.
-	defer func() {
-		if err == nil {
-			dst, err = os.Open(dstName)
-		}
-	}()
-
-	pt := &passthru{
-		Reader:    src,
-		nExpected: uint64(srcInfo.Size()),
-	}
-	defer pt.Reset()
-
-	szr := snappy.NewReader(pt)
-	defer szr.Reset(nil)
-
-	defer print()
-	_, err = io.Copy(dst, szr)
-	return
-}
-
 // Compress a file to a snappy archive.
 func snap(src *os.File) (dst *os.File, err error) {
 	// Remember to re-open the destination file after compression.
@@ -117,4 +77,44 @@ func snapCopy(sz *snappy.Writer, src *os.File) (int64, error) {
 	// }
 	// totalWritten, err = sz.Write(srcContents)
 	// return int64(totalWritten), err
+}
+
+// Decompress a snappy archive.
+func unsnap(src *os.File) (dst *os.File, err error) {
+	srcInfo, err := src.Stat()
+	if err != nil {
+		return
+	}
+	srcName := srcInfo.Name()
+
+	// Make sure existing files are not overwritten.
+	dstName := strings.TrimSuffix(srcName, ".sz")
+
+	getUnusedFilename(&dstName)
+	print(concat(srcName, "  >  ", dstName))
+
+	// Create the destination file.
+	dst, err = create(dstName, srcInfo.Mode())
+	if err != nil {
+		return
+	}
+	// Remember to re-open the uncompressed file after it has been written.
+	defer func() {
+		if err == nil {
+			dst, err = os.Open(dstName)
+		}
+	}()
+
+	pt := &passthru{
+		Reader:    src,
+		nExpected: uint64(srcInfo.Size()),
+	}
+	defer pt.Reset()
+
+	szr := snappy.NewReader(pt)
+	defer szr.Reset(nil)
+
+	defer print()
+	_, err = io.Copy(dst, szr)
+	return
 }
