@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -42,10 +41,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
-	if DstDir != "" {
-		dstName = path.Join(DstDir, dstName)
-	}
-	unusedFilename(&dstName)
+	setDstName(&dstName)
 
 	if !DoQuiet {
 		fmt.Println(concat(dirName, "  >  ", dstName))
@@ -223,10 +219,7 @@ func tarDir2(dir *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
-	if DstDir != "" {
-		dstName = path.Join(DstDir, dstName)
-	}
-	unusedFilename(&dstName)
+	setDstName(&dstName)
 
 	if !DoQuiet {
 		fmt.Println(concat(dirName, "  >  ", dstName))
@@ -369,10 +362,7 @@ func untar(file *os.File) error {
 
 	// Make sure existing files are not overwritten.
 	dstName := topDir
-	if DstDir != "" {
-		dstName = path.Join(DstDir, dstName)
-	}
-	unusedFilename(&dstName)
+	setDstName(&dstName)
 
 	// Re-open the readers.
 	file, err = os.Open(file.Name())

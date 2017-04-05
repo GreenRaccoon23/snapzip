@@ -3,7 +3,6 @@ package main
 import (
 	"io"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/golang/snappy"
@@ -28,10 +27,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(srcName, ".sz")
-	if DstDir != "" {
-		dstName = path.Join(DstDir, dstName)
-	}
-	unusedFilename(&dstName)
+	setDstName(&dstName)
 
 	print(concat(srcName, "  >  ", dstName))
 
@@ -94,10 +90,7 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	// Make sure existing files are not overwritten.
 	dstName := strings.TrimSuffix(srcName, ".sz")
-	if DstDir != "" {
-		dstName = path.Join(DstDir, dstName)
-	}
-	unusedFilename(&dstName)
+	setDstName(&dstName)
 
 	print(concat(srcName, "  >  ", dstName))
 

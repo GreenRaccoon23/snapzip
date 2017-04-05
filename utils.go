@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"mime"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -71,6 +72,13 @@ func create(filename string, mode os.FileMode) (*os.File, error) {
 		mode,
 	)
 	return file, err
+}
+
+func setDstName(dstName *string) {
+	if DstDir != "" {
+		*dstName = path.Join(DstDir, *dstName)
+	}
+	unusedFilename(dstName)
 }
 
 // Modify a filename to one that has not been used by the system.
