@@ -64,7 +64,7 @@ func isTar(file *os.File) bool {
 
 // Create a file if it doesn't exist. Otherwise, just open it.
 func create(filename string, mode os.FileMode) (*os.File, error) {
-	// getUnusedFilename(&filename)
+	// unusedFilename(&filename)
 	file, err := os.OpenFile(
 		filename,
 		os.O_RDWR|os.O_CREATE|os.O_APPEND,
@@ -74,7 +74,7 @@ func create(filename string, mode os.FileMode) (*os.File, error) {
 }
 
 // Modify a filename to one that has not been used by the system.
-func getUnusedFilename(filename *string) {
+func unusedFilename(filename *string) {
 
 	if !exists(*filename) {
 		return

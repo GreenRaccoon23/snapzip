@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"path"
+	"strings"
 	"sync"
 )
 
@@ -10,6 +12,8 @@ var (
 	DoQuiet bool
 	// Files are the filepaths to be compressed/uncompressed
 	Files []string
+	// DstDir is the optional location to place compressed/uncompressed files
+	DstDir string
 	// doBring         bool
 	// doSingleArchive bool
 	// dstArchive      string
@@ -42,12 +46,23 @@ func helpRequested() bool {
 // Parse user arguments and modify global variables accordingly.
 func setGlobalVars() {
 
-	for _, arg := range os.Args[1:] {
+	max := len(os.Args)
+
+	for i := 1; i < max; i++ {
+		arg := os.Args[i]
+
 		switch arg {
 		case "-q":
 			DoQuiet = true
+		case "--dst-dir":
+			i, arg = nextArg(i)
+			DstDir = arg
 		default:
-			Files = append(Files, arg)
+			if strings.HasPrefix(arg, "--dst-dir=") {
+				DstDir = strings.Replace(arg, "--dst-dir=", "", 1)
+			} else {
+				Files = append(Files, arg)
+			}
 		}
 	}
 
@@ -59,7 +74,21 @@ func setGlobalVars() {
 		print = printNoop
 	}
 
+	if DstDir != "" {
+		DstDir = path.Clean(DstDir)
+	}
+
 	return
+}
+
+func nextArg(i int) (int, string) {
+	i++
+	if i >= len(os.Args) {
+		printHelp()
+		os.Exit(2)
+	}
+	arg := os.Args[i]
+	return i, arg
 }
 
 func main() {

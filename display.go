@@ -20,7 +20,8 @@ Usage: snapzip [option ...] [file ...]
 Description:
     Compress/uncompress files to/from snappy archives.
 Options:
-    -q        Do not show any output
+    -q                Do not show any output
+    --dst-dir <path>  Place files under <path>
 Notes:
     This program automatically determines whether a file should be
       compressed or decompressed.
