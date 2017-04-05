@@ -19,7 +19,8 @@ func snap(src *os.File) (dst *os.File, err error) {
 	}()
 
 	// Get file info.
-	srcInfo, err := src.Stat()
+	var srcInfo os.FileInfo
+	srcInfo, err = src.Stat()
 	if err != nil {
 		return
 	}
@@ -82,7 +83,8 @@ func snapCopy(sz *snappy.Writer, src *os.File) (int64, error) {
 
 // Decompress a snappy archive.
 func unsnap(src *os.File) (dst *os.File, err error) {
-	srcInfo, err := src.Stat()
+	var srcInfo os.FileInfo
+	srcInfo, err = src.Stat()
 	if err != nil {
 		return
 	}

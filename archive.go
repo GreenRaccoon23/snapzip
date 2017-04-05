@@ -31,7 +31,8 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	}()
 
 	// Get file info for the source directory.
-	dirInfo, err := dir.Stat()
+	var dirInfo os.FileInfo
+	dirInfo, err = dir.Stat()
 	if err != nil {
 		return
 	}
@@ -209,7 +210,8 @@ func tarDir2(dir *os.File) (dst *os.File, err error) {
 	}()
 
 	// Get file info for the source directory.
-	dirInfo, err := dir.Stat()
+	var dirInfo os.FileInfo
+	dirInfo, err = dir.Stat()
 	if err != nil {
 		return
 	}
