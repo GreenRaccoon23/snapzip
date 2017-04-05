@@ -1,11 +1,8 @@
 package main
 
 import (
-	"flag"
 	"os"
 	"sync"
-
-	"github.com/GreenRaccoon23/slices"
 )
 
 var (
@@ -45,32 +42,23 @@ func helpRequested() bool {
 // Parse user arguments and modify global variables accordingly.
 func setGlobalVars() {
 
-	// Parse commandline arguments.
-	//flag.StringVar(&dstArchive, "a", "", "")
-	flag.BoolVar(&DoQuiet, "q", false, "")
-	flag.Parse()
-
-	// Modify global variables based on commandline arguments.
-	Files = os.Args[1:]
-
-	// if !DoQuiet && dstArchive == "" {
-	//  return
-	// }
+	for _, arg := range os.Args[1:] {
+		switch arg {
+		case "-q":
+			DoQuiet = true
+		default:
+			Files = append(Files, arg)
+		}
+	}
 
 	if len(Files) > 1 {
 		DoQuiet = true
 	}
 
 	if DoQuiet {
-		boolArgs := []string{"-q"}
-		Files = slices.Filter(Files, boolArgs...)
 		print = printNoop
 	}
 
-	// if dstArchive != "" {
-	//  // doSingleArchive = true
-	//  Files = slices.Filter(Files, dstArchive)
-	// }
 	return
 }
 
