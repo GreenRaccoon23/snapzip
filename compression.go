@@ -56,8 +56,8 @@ func snap(src *os.File) (dst *os.File, err error) {
 	return
 }
 
-// snappy.maxUncompressedChunkLen
-const SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN = 65536
+// SnappyMaxUncompressedChunkLen is a copy of snappy.maxUncompressedChunkLen
+const SnappyMaxUncompressedChunkLen = 65536 // ignore gometalinter
 
 // Read data from a source file,
 //   compress the data,
@@ -67,7 +67,7 @@ const SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN = 65536
 //   and the destination Writer is a *snappy.Writer.
 func snapCopy(sz *snappy.Writer, src *os.File) (int64, error) {
 
-	buf := make([]byte, SNAPPY_MAX_UNCOMPRESSED_CHUNK_LEN)
+	buf := make([]byte, SnappyMaxUncompressedChunkLen)
 	return io.CopyBuffer(sz, src, buf)
 
 	// Slow and dangerous. Kept for testing purposes.

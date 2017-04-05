@@ -108,7 +108,7 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 
 		// Make sure progress isn't outputted too quickly
 		//   for the console.
-		progress += 1
+		progress++
 		percent := int(float64(progress) / float64(total) * float64(100))
 		if int(time.Since(start)) < 500000 && percent < 98 {
 			return nil
@@ -260,19 +260,21 @@ func tarDir2(dir *os.File) (dst *os.File, err error) {
 			//   anoying, empty diretories.
 			// E.g., make an archive of '/home/me/Documents' extract to
 			//   'Documents', not to '/home/me/Documents'.
-			name, err := filepath.Rel(parent, path)
+			var name string
+			name, err = filepath.Rel(parent, path)
 			if err != nil {
 				return err
 			}
 
 			// Get a header for the file.
-			hdr, err := ta.getHeader(path, name)
+			var hdr *tar.Header
+			hdr, err = ta.getHeader(path, name)
 			if err != nil {
 				return err
 			}
 
 			// Write the header.
-			if err := ta.write(hdr, path); err != nil {
+			if err = ta.write(hdr, path); err != nil {
 				return err
 			}
 
@@ -283,7 +285,7 @@ func tarDir2(dir *os.File) (dst *os.File, err error) {
 
 			// Make sure progress isn't outputted too quickly
 			//   for the console.
-			progress += 1
+			progress++
 			percent := int(float64(progress) / float64(total) * float64(100))
 
 			tooSoonToPrint := (int(time.Since(start)) < 500000)
@@ -375,10 +377,10 @@ func untar(file *os.File) error {
 		return err
 	}
 	total := uint64(fi.Size())
-	name := fi.Name()
+	dirname := fi.Name()
 
 	// Extract the archive.
-	print(concat(name, "  >  ", dstName))
+	print(concat(dirname, "  >  ", dstName))
 	defer print()
 	var progress uint64
 	var outputLength int
@@ -461,7 +463,7 @@ func untar(file *os.File) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%v\nFailed to extract %v", err, name)
+		return fmt.Errorf("%v\nFailed to extract %v", err, dirname)
 	}
 	return nil
 }
@@ -507,7 +509,7 @@ func findTopDirInArchive(file *os.File) (topDir string, err error) {
 
 	// If no names were found, the data is corrupt.
 	if topDir == "" {
-		err = fmt.Errorf("Unable to read %v. Data is corrupt.", file.Name())
+		err = fmt.Errorf("unable to read %v", file.Name())
 	}
 
 	return

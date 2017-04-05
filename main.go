@@ -9,8 +9,10 @@ import (
 )
 
 var (
+	// DoQuiet means no output
 	DoQuiet bool
-	Files   []string
+	// Files are the filepaths to be compressed/uncompressed
+	Files []string
 	// doBring         bool
 	// doSingleArchive bool
 	// dstArchive      string
@@ -134,8 +136,6 @@ func compressOrDecompress(path string) error {
 		_, err := snap(file)
 		return err
 	}
-
-	return nil
 }
 
 // Uncompress a file.

@@ -153,7 +153,7 @@ func fmtDir(name *string) {
 // Return the total size in bytes and number of files under a directory.
 func dirSize(dir string) (i int) {
 	filepath.Walk(dir, func(path string, fi os.FileInfo, err error) error {
-		i += 1
+		i++
 		return nil
 	})
 	return
