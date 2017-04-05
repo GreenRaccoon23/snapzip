@@ -10,7 +10,7 @@ declare -r OS_ANDROID="android";
 declare -r ARCH_32="386";
 declare -r ARCH_64="amd64";
 declare -r ARCH_32_ARM="arm";
-declare -r ARCH_64_ARM="arm64";
+# declare -r ARCH_64_ARM="arm64";
 
 # Capitalize the first letter of a string.
 _capitalize() {
@@ -65,7 +65,7 @@ _build() {
 _buildAndroid() {
     # _build "${OS_ANDROID}" "${ARCH_32_ARM}";
     # _build "${OS_ANDROID}" "${ARCH_64_ARM}";
-    
+
     ##############################
     # THIS ONE ACTUALLY WORKS!!!!!
     ##############################
