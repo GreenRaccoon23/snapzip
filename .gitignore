@@ -4,6 +4,7 @@ test*/**
 short-file*
 long-file*
 long-file2
-tmp/**
+tmp*
+tmp*/**
 snapzip
 dev/**
