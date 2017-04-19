@@ -298,7 +298,7 @@ func untar(src *os.File) (string, error) {
 		// Make sure existing files are not overwritten.
 		name := hdr.Name
 		name = strings.Replace(name, topDir, dstName, 1)
-		name = unusedFilename(name)
+		name = unusedPath(name)
 
 		switch hdr.Typeflag {
 		case tar.TypeDir:
