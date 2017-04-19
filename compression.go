@@ -75,11 +75,11 @@ func snapCopy(sz *snappy.Writer, src *os.File) (int64, error) {
 }
 
 // Decompress a snappy archive.
-func unsnap(src *os.File) (dst *os.File, err error) {
-	var srcInfo os.FileInfo
-	srcInfo, err = src.Stat()
+func unsnap(src *os.File) (string, error) {
+
+	srcInfo, err := src.Stat()
 	if err != nil {
-		return
+		return "", err
 	}
 	srcName := srcInfo.Name()
 
@@ -90,16 +90,10 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 	print(concat(srcName, "  >  ", dstName))
 
 	// Create the destination file.
-	dst, err = create(dstName, srcInfo.Mode())
+	dst, err := create(dstName, srcInfo.Mode())
 	if err != nil {
-		return
+		return "", err
 	}
-	// Remember to re-open the uncompressed file after it has been written.
-	defer func() {
-		if err == nil {
-			dst, err = os.Open(dstName)
-		}
-	}()
 
 	pt := &passthru{
 		Reader:    src,
@@ -112,5 +106,9 @@ func unsnap(src *os.File) (dst *os.File, err error) {
 
 	defer print()
 	_, err = io.Copy(dst, szr)
-	return
+	if err != nil {
+		return "", err
+	}
+
+	return dstName, nil
 }

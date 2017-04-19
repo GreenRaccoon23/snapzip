@@ -165,22 +165,27 @@ func compressOrDecompress(path string) (string, error) {
 func unsnapAndUntar(src *os.File) (string, error) {
 
 	// Uncompress it.
-	uncompressed, err := unsnap(src)
+	unsnappedName, err := unsnap(src)
 	if err != nil {
 		return "", err
 	}
 
-	// If the uncompressed file is not a tar archive, don't try to untar it.
-	if !isTar(uncompressed) {
+	unsnapped, err := os.Open(unsnappedName)
+	if err != nil {
+		return "", err
+	}
+
+	// If the unsnapped file is not a tar archive, don't try to untar it.
+	if !isTar(unsnapped) {
 		return "", nil
 	}
 
-	// Remember to remove the uncompressed tar archive.
+	// Remember to remove the unsnapped tar archive.
 	defer func() {
-		os.Remove(uncompressed.Name())
+		os.Remove(unsnappedName)
 	}()
 
-	dstName, err := untar(uncompressed)
+	dstName, err := untar(unsnapped)
 	if err != nil {
 		return "", err
 	}
