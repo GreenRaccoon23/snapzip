@@ -15,8 +15,7 @@ import (
 type tarAppender struct {
 	tarWriter *tar.Writer
 	// Map inodes to hardlinks.
-	hardLinks  map[uint64]string
-	hardLinks2 []uint64
+	hardLinks map[uint64]string
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
