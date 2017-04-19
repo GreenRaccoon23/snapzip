@@ -192,21 +192,12 @@ func (ta *tarAppender) getHeader(path, name string) (*tar.Header, error) {
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Create a tar archive of a directory.
-func tarDir2(src *os.File) (dst *os.File, err error) {
-
-	// Remember to re-open the tar archive after creation.
-	defer func() {
-		if err != nil {
-			return
-		}
-		dst, err = os.Open(dst.Name())
-	}()
+func tarDir2(src *os.File) (string, error) {
 
 	// Get file info for the source directory.
-	var srcInfo os.FileInfo
-	srcInfo, err = src.Stat()
+	srcInfo, err := src.Stat()
 	if err != nil {
-		return
+		return "", err
 	}
 	srcName := src.Name()
 	baseName := filepath.Base(srcName)
@@ -222,9 +213,9 @@ func tarDir2(src *os.File) (dst *os.File, err error) {
 	}
 
 	// Create the destination file.
-	dst, err = create(dstName, srcInfo.Mode())
+	dst, err := create(dstName, srcInfo.Mode())
 	if err != nil {
-		return
+		return "", err
 	}
 
 	// Pipe the destination file through a *tarAppender.
@@ -235,9 +226,7 @@ func tarDir2(src *os.File) (dst *os.File, err error) {
 	}
 
 	// Remember to close the tarWriter.
-	defer func() {
-		err = ta.tarWriter.Close()
-	}()
+	defer ta.tarWriter.Close()
 
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
@@ -301,11 +290,11 @@ func tarDir2(src *os.File) (dst *os.File, err error) {
 			return nil
 		}()
 		if err != nil {
-			return
+			return "", err
 		}
 	}
 
-	return
+	return dstName, nil
 }
 
 func (ta *tarAppender) write(hdr *tar.Header, path string) error {
