@@ -132,39 +132,40 @@ func editFiles() {
 //   added to a tar archive and then compressed.
 func compressOrDecompress(path string) (string, error) {
 
-	file, err := os.Open(path)
+	src, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer src.Close()
+
+	var dstName string
 
 	switch {
 
-	// If the file is a snappy file, uncompress it.
-	case isSz(file):
-		dstName, err := unsnapAndUntar(file)
-		return dstName, err
+	// If `src` is a snappy file, uncompress it.
+	case isSz(src):
+		dstName, err = unsnapAndUntar(src)
 
-	// If the file is a directory, tar it before compressing it.
+	// If `src` is a directory, tar it before compressing it.
 	// (Simultaneously compressing and tarring the file
 	//   results in a much lower compression ratio.)
-	case isDir(file):
-		dstName, err := tarAndSnap(file)
-		return dstName, err
+	case isDir(src):
+		dstName, err = tarAndSnap(src)
 
-	// If the file is any other type, compress it.
+	// If `src` is any other type, compress it.
 	default:
-		dstName, err := snap(file)
-		return dstName, err
+		dstName, err = snap(src)
 	}
+
+	return dstName, err
 }
 
 // Uncompress a file.
 // Then, if the uncompressed file is a tar archive, extract it as well.
-func unsnapAndUntar(file *os.File) (string, error) {
+func unsnapAndUntar(src *os.File) (string, error) {
 
 	// Uncompress it.
-	uncompressed, err := unsnap(file)
+	uncompressed, err := unsnap(src)
 	if err != nil {
 		return "", err
 	}
@@ -184,17 +185,17 @@ func unsnapAndUntar(file *os.File) (string, error) {
 		return "", err
 	}
 
-	return dstName, nil
+	return dstName, err
 }
 
 // Make a temporary tar archive of a file and then compress it.
 // (Simultaneously compressing and tarring the file
 //  results in a much lower compression ratio.)
 // Remove the temporary tar archive if no errors occur.
-func tarAndSnap(file *os.File) (string, error) {
+func tarAndSnap(src *os.File) (string, error) {
 
 	// Tar it.
-	tmpArchive, err := tarDir(file)
+	tmpArchive, err := tarDir(src)
 	if err != nil {
 		return "", err
 	}
