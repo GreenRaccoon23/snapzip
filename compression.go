@@ -9,20 +9,11 @@ import (
 )
 
 // Compress a file to a snappy archive.
-func snap(src *os.File) (dst *os.File, err error) {
-	// Remember to re-open the destination file after compression.
-	defer func() {
-		if err != nil {
-			return
-		}
-		dst, err = os.Open(dst.Name())
-	}()
-
+func snap(src *os.File) (string, error) {
 	// Get file info.
-	var srcInfo os.FileInfo
-	srcInfo, err = src.Stat()
+	srcInfo, err := src.Stat()
 	if err != nil {
-		return
+		return "", err
 	}
 	srcName := src.Name()
 
@@ -33,10 +24,11 @@ func snap(src *os.File) (dst *os.File, err error) {
 	print(concat(srcName, "  >  ", dstName))
 
 	// Create the destination file.
-	dst, err = create(dstName, srcInfo.Mode())
+	dst, err := create(dstName, srcInfo.Mode())
 	if err != nil {
-		return
+		return "", err
 	}
+	defer dst.Close()
 
 	// Set up a *passthru writer in order to print progress.
 	pt := &passthru{
@@ -53,9 +45,10 @@ func snap(src *os.File) (dst *os.File, err error) {
 	_, err = snapCopy(sz, src)
 	print()
 	if err != nil {
-		return
+		return "", err
 	}
-	return
+
+	return dstName, nil
 }
 
 // SnappyMaxUncompressedChunkLen is a copy of snappy.maxUncompressedChunkLen

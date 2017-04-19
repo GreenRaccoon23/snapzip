@@ -154,11 +154,7 @@ func compressOrDecompress(path string) (string, error) {
 
 	// If the file is any other type, compress it.
 	default:
-		dst, err := snap(file)
-		if err != nil {
-			return "", err
-		}
-		dstName := dst.Name()
+		dstName, err := snap(file)
 		return dstName, err
 	}
 }
@@ -212,13 +208,10 @@ func tarAndSnap(file *os.File) (string, error) {
 	}()
 
 	// Compress it.
-	dst, err := snap(tmpArchive)
+	dstName, err := snap(tmpArchive)
 	if err != nil {
 		return "", err
 	}
-	defer dst.Close()
-
-	dstName := dst.Name()
 
 	return dstName, nil
 }
