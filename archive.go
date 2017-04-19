@@ -37,8 +37,8 @@ func tarDir(src *os.File) (string, error) {
 	setDstName(&dstName)
 
 	if !DoQuiet {
-		fmt.Println(concat(srcName, "  >  ", dstName))
-		defer fmt.Println()
+		print(concat(srcName, "  >  ", dstName))
+		defer print()
 	}
 
 	// Create the destination file.
@@ -208,8 +208,8 @@ func tarDir2(src *os.File) (string, error) {
 	setDstName(&dstName)
 
 	if !DoQuiet {
-		fmt.Println(concat(srcName, "  >  ", dstName))
-		defer fmt.Println()
+		print(concat(srcName, "  >  ", dstName))
+		defer print()
 	}
 
 	// Create the destination file.
