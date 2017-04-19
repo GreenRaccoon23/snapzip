@@ -18,6 +18,10 @@ type tarchive struct {
 	writer  *tar.Writer
 	// Map inodes to hardlinks.
 	hardlinks map[uint64]string
+
+	srcName string
+	src     *os.File
+	reader  *tar.Reader
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
@@ -41,6 +45,7 @@ func tarDir(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer t.close()
 
 	err = t.tar(srcName)
@@ -69,9 +74,18 @@ func (t *tarchive) create(dstName string, mode os.FileMode) error {
 }
 
 func (t *tarchive) close() {
-	t.dst.Close()
-	t.writer.Close()
-	t.hardlinks = nil
+
+	if t.dst != nil {
+		t.dst.Close()
+		t.writer.Close()
+		t.hardlinks = nil
+	}
+
+	if t.src != nil {
+		t.src.Close()
+		t.reader = nil
+	}
+
 	t = nil
 }
 
@@ -250,54 +264,125 @@ func (t *tarchive) write(hdr *tar.Header, path string) error {
 	return tb.Flush()
 }
 
-func (t *tarchive) openReader(dstName string, mode os.FileMode) error {
-
-	dst, err := create(dstName, mode)
-	if err != nil {
-		return err
-	}
-
-	var dstWriteCloser io.WriteCloser = dst
-
-	t.dstName = dstName
-	t.dst = dst
-	t.writer = tar.NewWriter(dstWriteCloser)
-	t.hardlinks = make(map[uint64]string)
-
-	return nil
-}
-
 // Extract a tar archive.
 func untar(src *os.File) (string, error) {
 
 	srcName := src.Name()
 
-	// Get the smallest directory name (top directory).
-	topDir, err := findTopDirInArchive(src)
+	var t *tarchive
+	err := t.open(srcName)
 	if err != nil {
 		return "", err
+	}
+
+	defer t.close()
+
+	// Get the smallest directory name (top directory).
+	headName, err := t.head()
+	if err != nil {
+		return "", err
+	}
+
+	// Make sure existing files are not overwritten.
+	dstName := headName
+	setDstName(&dstName)
+
+	err = t.untar(dstName, headName)
+	if err != nil {
+		return "", fmt.Errorf("%v\nFailed to extract %v", err, srcName)
+	}
+
+	return dstName, nil
+}
+
+func (t *tarchive) open(srcName string) error {
+
+	src, err := os.Open(srcName)
+	if err != nil {
+		return err
+	}
+
+	t.srcName = srcName
+	t.src = src
+	t.reader = tar.NewReader(src)
+
+	return nil
+}
+
+// Search a tar file for the top-level directory to be extracted.
+func (t *tarchive) head() (string, error) {
+
+	tr := t.reader
+	srcName := t.srcName
+
+	var headName string
+	var err error
+
+	defer func() {
+		t.close()
+		t = &tarchive{}
+		t.open(srcName)
+	}()
+
+	// Get the smallest directory name (top directory).
+	for {
+		var hdr *tar.Header
+		hdr, err = tr.Next()
+
+		// Break if the end of the tar archive has been reached.
+		if err != nil {
+			if done := (err == io.EOF); done {
+				err = nil
+			}
+			break
+		}
+
+		// Set headName to the very first header name.
+		// Most likely, this will be the name of the top directory anyway.
+		if headName == "" {
+			headName = hdr.Name
+		}
+
+		// Skip non-directories.
+		if hdr.Typeflag != tar.TypeDir {
+			continue
+		}
+
+		// The top directory is the shortest path and has the shortest name.
+		if higher := (len(hdr.Name) < len(headName)); higher {
+			headName = hdr.Name
+		}
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	// If no names were found, the data is corrupt.
+	if noHead := (headName == ""); noHead {
+		return "", fmt.Errorf("unable to read %v", srcName)
 	}
 
 	// Strip off the trailing '/'.
-	topDir = topDir[0 : len(topDir)-1]
+	headName = headName[0 : len(headName)-1]
 
-	// Make sure existing files are not overwritten.
-	dstName := topDir
-	setDstName(&dstName)
+	return headName, nil
+}
 
-	// Re-open the readers.
-	src, err = os.Open(srcName)
-	if err != nil {
-		return "", err
-	}
-	tr := tar.NewReader(src)
+// Extract a tar archive.
+func (t *tarchive) untar(dstName string, headName string) error {
+
+	src := t.src
+	srcName := t.srcName
+	tr := t.reader
 
 	// Get file info.
 	srcInfo, err := src.Stat()
 	if err != nil {
-		return "", err
+		return err
 	}
-	total := uint64(srcInfo.Size())
+	srcSize := srcInfo.Size()
+	total := uint64(srcSize)
 
 	var progress uint64
 	var outputLength int
@@ -323,7 +408,7 @@ func untar(src *os.File) (string, error) {
 
 		// Make sure existing files are not overwritten.
 		name := hdr.Name
-		name = strings.Replace(name, topDir, dstName, 1)
+		name = strings.Replace(name, headName, dstName, 1)
 		name = unusedPath(name)
 
 		switch hdr.Typeflag {
@@ -387,54 +472,8 @@ func untar(src *os.File) (string, error) {
 	}
 
 	if err != nil {
-		return "", fmt.Errorf("%v\nFailed to extract %v", err, srcName)
-	}
-	return dstName, nil
-}
-
-// Search a tar file for the top-level directory to be extracted.
-func findTopDirInArchive(file *os.File) (topDir string, err error) {
-	// Wrap a *tar.Reader around the *os.File.
-	tr := tar.NewReader(file)
-	defer func() {
-		tr = nil
-		file.Close()
-	}()
-
-	// Get the smallest directory name (top directory).
-	for {
-		var hdr *tar.Header
-		hdr, err = tr.Next()
-
-		// Break if the end of the tar archive has been reached.
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			}
-			break
-		}
-
-		// Set topDir to the very first header name.
-		// Most likely, this will be the name of the top directory anyway.
-		if topDir == "" {
-			topDir = hdr.Name
-		}
-
-		// Skip non-directories.
-		if hdr.Typeflag != tar.TypeDir {
-			continue
-		}
-
-		// The top directory is the shortest path and has the shortest name.
-		if len(hdr.Name) < len(topDir) {
-			topDir = hdr.Name
-		}
+		return err
 	}
 
-	// If no names were found, the data is corrupt.
-	if topDir == "" {
-		err = fmt.Errorf("unable to read %v", file.Name())
-	}
-
-	return
+	return nil
 }
