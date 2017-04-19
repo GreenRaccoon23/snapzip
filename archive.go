@@ -52,9 +52,7 @@ func tarDir(src *os.File) (string, error) {
 		writer:    tar.NewWriter(dstWriter),
 		hardlinks: make(map[uint64]string),
 	}
-
-	// Remember to close the writer.
-	defer t.writer.Close()
+	defer t.close()
 
 	err = t.walk(srcName)
 	if err != nil {
@@ -62,6 +60,11 @@ func tarDir(src *os.File) (string, error) {
 	}
 
 	return dstName, nil
+}
+
+func (t *tarchive) close() {
+	t.writer.Close()
+	t.hardlinks = nil
 }
 
 // Walk through the directory.
@@ -232,9 +235,7 @@ func tarDir2(src *os.File) (string, error) {
 		writer:    tar.NewWriter(dstWriter),
 		hardlinks: make(map[uint64]string),
 	}
-
-	// Remember to close the writer.
-	defer t.writer.Close()
+	defer t.close()
 
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
