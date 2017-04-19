@@ -37,7 +37,7 @@ func tarDir(src *os.File) (string, error) {
 	setDstName(&dstName)
 
 	var t *tarchive
-	err = t.open(dstName, srcMode)
+	err = t.create(dstName, srcMode)
 	if err != nil {
 		return "", err
 	}
@@ -51,7 +51,7 @@ func tarDir(src *os.File) (string, error) {
 	return dstName, nil
 }
 
-func (t *tarchive) open(dstName string, mode os.FileMode) error {
+func (t *tarchive) create(dstName string, mode os.FileMode) error {
 
 	dst, err := create(dstName, mode)
 	if err != nil {
