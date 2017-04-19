@@ -48,7 +48,7 @@ func tarDir(src *os.File) (string, error) {
 		defer print()
 	}
 
-	err = t.walk(srcName)
+	err = t.tar(srcName)
 	if err != nil {
 		return "", err
 	}
@@ -80,7 +80,7 @@ func (t *tarchive) close() {
 
 // Walk through the directory.
 // Add a header to the tar archive for each file encountered.
-func (t *tarchive) walk(srcName string) error {
+func (t *tarchive) tar(srcName string) error {
 
 	var total int
 	var progress int
