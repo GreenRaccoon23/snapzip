@@ -200,21 +200,26 @@ func unsnapAndUntar(src *os.File) (string, error) {
 func tarAndSnap(src *os.File) (string, error) {
 
 	// Tar it.
-	tmpArchive, err := tarDir(src)
+	tarredName, err := tarDir(src)
+	if err != nil {
+		return "", err
+	}
+
+	tarred, err := os.Open(tarredName)
 	if err != nil {
 		return "", err
 	}
 
 	// Remember to close and remove the temporary tar archive.
-	defer tmpArchive.Close()
+	defer tarred.Close()
 	defer func() {
 		if err == nil {
-			os.Remove(tmpArchive.Name())
+			os.Remove(tarred.Name())
 		}
 	}()
 
 	// Compress it.
-	dstName, err := snap(tmpArchive)
+	dstName, err := snap(tarred)
 	if err != nil {
 		return "", err
 	}
