@@ -12,14 +12,14 @@ import (
 // Add a file's device major and minor numbers
 //   to the file's header within a tar archive.
 // Return the file's inode and the number of hardlinks to that inode.
-func tarSetHeader(hdr *tar.Header, stat interface{}) (hasHardLinks bool, inode uint64, err error) {
+func tarSetHeader(hdr *tar.Header, stat interface{}) (hasHardlinks bool, inode uint64, err error) {
 	s, ok := stat.(*syscall.Stat_t)
 	if !ok {
 		err = fmt.Errorf("cannot convert stat value to syscall.Stat_t")
 		return
 	}
 
-	hasHardLinks = (uint32(s.Nlink) > 1)
+	hasHardlinks = (uint32(s.Nlink) > 1)
 	inode = uint64(s.Ino)
 
 	// Currently go does not fill in the major/minors

@@ -7,7 +7,7 @@ import "archive/tar"
 // Add a file's device major and minor numbers
 //   to the file's header within a tar archive.
 // Return the file's inode and the number of hardlinks to that inode.
-func tarSetHeader(hdr *tar.Header, stat interface{}) (hasHardLinks bool, inode uint64, err error) {
+func tarSetHeader(hdr *tar.Header, stat interface{}) (hasHardlinks bool, inode uint64, err error) {
 	return
 }
 

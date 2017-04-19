@@ -15,7 +15,7 @@ import (
 type tarchive struct {
 	writer *tar.Writer
 	// Map inodes to hardlinks.
-	hardLinks map[uint64]string
+	hardlinks map[uint64]string
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
@@ -50,7 +50,7 @@ func tarDir(src *os.File) (string, error) {
 	var dstWriter io.WriteCloser = dst
 	ta := &tarchive{
 		writer:    tar.NewWriter(dstWriter),
-		hardLinks: make(map[uint64]string),
+		hardlinks: make(map[uint64]string),
 	}
 
 	// Remember to close the writer.
@@ -158,7 +158,7 @@ func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
 	hdr.Name = name
 
 	// Check if the file has hard links.
-	hasHardLinks, inode, err := tarSetHeader(hdr, fi.Sys())
+	hasHardlinks, inode, err := tarSetHeader(hdr, fi.Sys())
 	if err != nil {
 		return nil, err
 	}
@@ -168,10 +168,10 @@ func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
 	// If the tar archive contains another hardlink to this file's inode,
 	//   set it as a "hardlink" in the tar header.
 	// Otherwise, treat it as a regular file.
-	if fi.Mode().IsRegular() && hasHardLinks {
+	if fi.Mode().IsRegular() && hasHardlinks {
 		// If this file is NOT the first found hardlink to this inode,
 		//   set the previously found hardlink as its 'Linkname'.
-		if firstInode, ok := ta.hardLinks[inode]; ok {
+		if firstInode, ok := ta.hardlinks[inode]; ok {
 			hdr.Typeflag = tar.TypeLink
 			hdr.Linkname = firstInode
 			// Set size to 0 when not adding additional inodes.
@@ -183,7 +183,7 @@ func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
 			// It will become the 'Linkname' for another hardlink
 			//   further down in the archive.
 		} else {
-			ta.hardLinks[inode] = name
+			ta.hardlinks[inode] = name
 		}
 	}
 
@@ -230,7 +230,7 @@ func tarDir2(src *os.File) (string, error) {
 	var dstWriter io.WriteCloser = dst
 	ta := &tarchive{
 		writer:    tar.NewWriter(dstWriter),
-		hardLinks: make(map[uint64]string),
+		hardlinks: make(map[uint64]string),
 	}
 
 	// Remember to close the writer.
