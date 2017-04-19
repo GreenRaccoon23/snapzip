@@ -59,7 +59,7 @@ func snap(src *os.File) (dst *os.File, err error) {
 }
 
 // SnappyMaxUncompressedChunkLen is a copy of snappy.maxUncompressedChunkLen
-const SnappyMaxUncompressedChunkLen = 65536 // ignore gometalinter
+const SnappyMaxUncompressedChunkLen = 65536
 
 // Read data from a source file,
 //   compress the data,

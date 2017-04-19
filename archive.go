@@ -21,7 +21,7 @@ type tarAppender struct {
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Create a tar archive of a directory.
-func tarDir(dir *os.File) (dst *os.File, err error) {
+func tarDir(src *os.File) (dst *os.File, err error) {
 	// Remember to re-open the tar archive after creation.
 	defer func() {
 		if err != nil {
@@ -31,26 +31,26 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	}()
 
 	// Get file info for the source directory.
-	var dirInfo os.FileInfo
-	dirInfo, err = dir.Stat()
+	var srcInfo os.FileInfo
+	srcInfo, err = src.Stat()
 	if err != nil {
 		return
 	}
-	dirName := dir.Name()
-	baseName := filepath.Base(dirName)
-	parent := filepath.Dir(dirName)
+	srcName := src.Name()
+	baseName := filepath.Base(srcName)
+	parent := filepath.Dir(srcName)
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
 	setDstName(&dstName)
 
 	if !DoQuiet {
-		fmt.Println(concat(dirName, "  >  ", dstName))
+		fmt.Println(concat(srcName, "  >  ", dstName))
 		defer fmt.Println()
 	}
 
 	// Create the destination file.
-	dst, err = create(dstName, dirInfo.Mode())
+	dst, err = create(dstName, srcInfo.Mode())
 	if err != nil {
 		return
 	}
@@ -72,10 +72,10 @@ func tarDir(dir *os.File) (dst *os.File, err error) {
 	var total, progress int
 	var start time.Time
 	if !DoQuiet {
-		total = dirSize(dirName)
+		total = dirSize(srcName)
 	}
 
-	err = filepath.Walk(dirName, func(path string, fi os.FileInfo, err error) error {
+	err = filepath.Walk(srcName, func(path string, fi os.FileInfo, err error) error {
 		// Quit if any errors occur.
 		if err != nil {
 			return err
@@ -199,7 +199,7 @@ func (ta *tarAppender) getHeader(path, name string) (*tar.Header, error) {
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Create a tar archive of a directory.
-func tarDir2(dir *os.File) (dst *os.File, err error) {
+func tarDir2(src *os.File) (dst *os.File, err error) {
 
 	// Remember to re-open the tar archive after creation.
 	defer func() {
@@ -210,26 +210,26 @@ func tarDir2(dir *os.File) (dst *os.File, err error) {
 	}()
 
 	// Get file info for the source directory.
-	var dirInfo os.FileInfo
-	dirInfo, err = dir.Stat()
+	var srcInfo os.FileInfo
+	srcInfo, err = src.Stat()
 	if err != nil {
 		return
 	}
-	dirName := dir.Name()
-	baseName := filepath.Base(dirName)
-	parent := filepath.Dir(dirName)
+	srcName := src.Name()
+	baseName := filepath.Base(srcName)
+	parent := filepath.Dir(srcName)
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
 	setDstName(&dstName)
 
 	if !DoQuiet {
-		fmt.Println(concat(dirName, "  >  ", dstName))
+		fmt.Println(concat(srcName, "  >  ", dstName))
 		defer fmt.Println()
 	}
 
 	// Create the destination file.
-	dst, err = create(dstName, dirInfo.Mode())
+	dst, err = create(dstName, srcInfo.Mode())
 	if err != nil {
 		return
 	}
@@ -248,7 +248,7 @@ func tarDir2(dir *os.File) (dst *os.File, err error) {
 
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
-	paths := getPaths(dirName)
+	paths := getPaths(srcName)
 	total := len(paths)
 
 	var progress int
@@ -352,9 +352,9 @@ func (ta *tarAppender) write(hdr *tar.Header, path string) error {
 }
 
 // Extract a tar archive.
-func untar(file *os.File) error {
+func untar(src *os.File) error {
 	// Get the smallest directory name (top directory).
-	topDir, err := findTopDirInArchive(file)
+	topDir, err := findTopDirInArchive(src)
 	if err != nil {
 		return err
 	}
@@ -367,22 +367,22 @@ func untar(file *os.File) error {
 	setDstName(&dstName)
 
 	// Re-open the readers.
-	file, err = os.Open(file.Name())
+	src, err = os.Open(src.Name())
 	if err != nil {
 		return err
 	}
-	tr := tar.NewReader(file)
+	tr := tar.NewReader(src)
 
 	// Get file info.
-	fi, err := file.Stat()
+	srcInfo, err := src.Stat()
 	if err != nil {
 		return err
 	}
-	total := uint64(fi.Size())
-	dirname := fi.Name()
+	total := uint64(srcInfo.Size())
+	srcName := srcInfo.Name()
 
 	// Extract the archive.
-	print(concat(dirname, "  >  ", dstName))
+	print(concat(srcName, "  >  ", dstName))
 	defer print()
 	var progress uint64
 	var outputLength int
@@ -465,7 +465,7 @@ func untar(file *os.File) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%v\nFailed to extract %v", err, dirname)
+		return fmt.Errorf("%v\nFailed to extract %v", err, srcName)
 	}
 	return nil
 }
