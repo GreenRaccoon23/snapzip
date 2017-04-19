@@ -46,6 +46,7 @@ func tarDir(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer dst.Close()
 
 	// Pipe the destination file through a *tarAppender.
 	var dstWriter io.WriteCloser = dst
@@ -217,6 +218,7 @@ func tarDir2(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer dst.Close()
 
 	// Pipe the destination file through a *tarAppender.
 	var dstWriter io.WriteCloser = dst

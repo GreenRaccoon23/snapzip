@@ -10,6 +10,7 @@ import (
 
 // Compress a file to a snappy archive.
 func snap(src *os.File) (string, error) {
+
 	// Get file info.
 	srcInfo, err := src.Stat()
 	if err != nil {
@@ -94,6 +95,7 @@ func unsnap(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer dst.Close()
 
 	pt := &passthru{
 		Reader:    src,
