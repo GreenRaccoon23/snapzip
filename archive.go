@@ -30,7 +30,6 @@ func tarDir(src *os.File) (string, error) {
 	}
 	srcName := src.Name()
 	baseName := filepath.Base(srcName)
-	parent := filepath.Dir(srcName)
 
 	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
@@ -58,16 +57,28 @@ func tarDir(src *os.File) (string, error) {
 	// Remember to close the tarWriter.
 	defer ta.tarWriter.Close()
 
-	// Walk through the directory.
-	// Add a header to the tar archive for each file encountered.
+	err = ta.walk(srcName)
+	if err != nil {
+		return "", err
+	}
+
+	return dstName, nil
+}
+
+// Walk through the directory.
+// Add a header to the tar archive for each file encountered.
+func (ta *tarAppender) walk(srcName string) error {
+
 	var total int
 	var progress int
 	var start time.Time
+	parent := filepath.Dir(srcName)
+
 	if !DoQuiet {
 		total = dirSize(srcName)
 	}
 
-	err = filepath.Walk(srcName, func(path string, fi os.FileInfo, err error) error {
+	return filepath.Walk(srcName, func(path string, fi os.FileInfo, err error) error {
 		// Quit if any errors occur.
 		if err != nil {
 			return err
@@ -115,11 +126,6 @@ func tarDir(src *os.File) (string, error) {
 		)
 		return nil
 	})
-	if err != nil {
-		return "", err
-	}
-
-	return dstName, nil
 }
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
