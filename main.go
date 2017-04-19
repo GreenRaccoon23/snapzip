@@ -112,7 +112,9 @@ func editFiles() {
 		go func(path string) {
 			defer wg.Done()
 			//path = filepath.Clean(path)
-			chanErr <- compressOrDecompress(path)
+			dstName, err := compressOrDecompress(path)
+			print(dstName)
+			chanErr <- err
 		}(path)
 	}
 
@@ -128,11 +130,11 @@ func editFiles() {
 
 // Determine whether a file should be compressed, uncompressed, or
 //   added to a tar archive and then compressed.
-func compressOrDecompress(path string) error {
+func compressOrDecompress(path string) (string, error) {
 
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
@@ -140,34 +142,40 @@ func compressOrDecompress(path string) error {
 
 	// If the file is a snappy file, uncompress it.
 	case isSz(file):
-		return unsnapAndUntar(file)
+		dstName, err := unsnapAndUntar(file)
+		return dstName, err
 
 	// If the file is a directory, tar it before compressing it.
 	// (Simultaneously compressing and tarring the file
 	//   results in a much lower compression ratio.)
 	case isDir(file):
-		return tarAndSnap(file)
+		dstName, err := tarAndSnap(file)
+		return dstName, err
 
 	// If the file is any other type, compress it.
 	default:
-		_, err := snap(file)
-		return err
+		dst, err := snap(file)
+		if err != nil {
+			return "", err
+		}
+		dstName := dst.Name()
+		return dstName, err
 	}
 }
 
 // Uncompress a file.
 // Then, if the uncompressed file is a tar archive, extract it as well.
-func unsnapAndUntar(file *os.File) error {
+func unsnapAndUntar(file *os.File) (string, error) {
 
 	// Uncompress it.
 	uncompressed, err := unsnap(file)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// If the uncompressed file is not a tar archive, don't try to untar it.
 	if !isTar(uncompressed) {
-		return nil
+		return "", nil
 	}
 
 	// Remember to remove the uncompressed tar archive.
@@ -175,19 +183,24 @@ func unsnapAndUntar(file *os.File) error {
 		os.Remove(uncompressed.Name())
 	}()
 
-	return untar(uncompressed)
+	dstName, err := untar(uncompressed)
+	if err != nil {
+		return "", err
+	}
+
+	return dstName, nil
 }
 
 // Make a temporary tar archive of a file and then compress it.
 // (Simultaneously compressing and tarring the file
 //  results in a much lower compression ratio.)
 // Remove the temporary tar archive if no errors occur.
-func tarAndSnap(file *os.File) error {
+func tarAndSnap(file *os.File) (string, error) {
 
 	// Tar it.
 	tmpArchive, err := tarDir(file)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Remember to close and remove the temporary tar archive.
@@ -199,6 +212,13 @@ func tarAndSnap(file *os.File) error {
 	}()
 
 	// Compress it.
-	_, err = snap(tmpArchive)
-	return err
+	dst, err := snap(tmpArchive)
+	if err != nil {
+		return "", err
+	}
+	defer dst.Close()
+
+	dstName := dst.Name()
+
+	return dstName, nil
 }

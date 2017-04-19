@@ -352,11 +352,11 @@ func (ta *tarAppender) write(hdr *tar.Header, path string) error {
 }
 
 // Extract a tar archive.
-func untar(src *os.File) error {
+func untar(src *os.File) (string, error) {
 	// Get the smallest directory name (top directory).
 	topDir, err := findTopDirInArchive(src)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Strip off the trailing '/'.
@@ -369,14 +369,14 @@ func untar(src *os.File) error {
 	// Re-open the readers.
 	src, err = os.Open(src.Name())
 	if err != nil {
-		return err
+		return "", err
 	}
 	tr := tar.NewReader(src)
 
 	// Get file info.
 	srcInfo, err := src.Stat()
 	if err != nil {
-		return err
+		return "", err
 	}
 	total := uint64(srcInfo.Size())
 	srcName := srcInfo.Name()
@@ -465,9 +465,9 @@ func untar(src *os.File) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%v\nFailed to extract %v", err, srcName)
+		return "", fmt.Errorf("%v\nFailed to extract %v", err, srcName)
 	}
-	return nil
+	return dstName, nil
 }
 
 // Search a tar file for the top-level directory to be extracted.
