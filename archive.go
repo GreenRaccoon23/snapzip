@@ -13,12 +13,14 @@ import (
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 type tarchive struct {
+	// tar
 	dstName string
 	dst     *os.File
 	writer  *tar.Writer
 	// Map inodes to hardlinks.
 	hardlinks map[uint64]string
 
+	// untar
 	srcName string
 	src     *os.File
 	reader  *tar.Reader
