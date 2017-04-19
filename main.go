@@ -178,7 +178,7 @@ func unsnapAndUntar(src *os.File) (string, error) {
 
 	// If `unsnapped` is not a tar archive, we are done.
 	if !isTar(unsnapped) {
-		return "", nil
+		return unsnappedName, nil
 	}
 
 	// Remove the temporary tar archive if nothing dies.
@@ -194,7 +194,7 @@ func unsnapAndUntar(src *os.File) (string, error) {
 		return "", err
 	}
 
-	return dstName, err
+	return dstName, nil
 }
 
 // Make a temporary tar archive of a file and then compress it.
