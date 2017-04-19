@@ -60,7 +60,8 @@ func tarDir(src *os.File) (string, error) {
 
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
-	var total, progress int
+	var total int
+	var progress int
 	var start time.Time
 	if !DoQuiet {
 		total = dirSize(srcName)
