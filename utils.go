@@ -95,9 +95,9 @@ func unusedPath(filename string) string {
 		//   since bash does not like the parentheses.
 		testname := concat(base, "(", strconv.Itoa(i), ")", ext)
 		if exists(testname) {
-			continue
+			continue // recursive case
 		}
-		return testname
+		return testname // base case
 	}
 
 	return filename
