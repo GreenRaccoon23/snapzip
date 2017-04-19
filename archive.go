@@ -48,15 +48,15 @@ func tarDir(src *os.File) (string, error) {
 
 	// Pipe the destination file through a *tarchive.
 	var dstWriter io.WriteCloser = dst
-	ta := &tarchive{
+	t := &tarchive{
 		writer:    tar.NewWriter(dstWriter),
 		hardlinks: make(map[uint64]string),
 	}
 
 	// Remember to close the writer.
-	defer ta.writer.Close()
+	defer t.writer.Close()
 
-	err = ta.walk(srcName)
+	err = t.walk(srcName)
 	if err != nil {
 		return "", err
 	}
@@ -66,7 +66,7 @@ func tarDir(src *os.File) (string, error) {
 
 // Walk through the directory.
 // Add a header to the tar archive for each file encountered.
-func (ta *tarchive) walk(srcName string) error {
+func (t *tarchive) walk(srcName string) error {
 
 	var total int
 	var progress int
@@ -94,13 +94,13 @@ func (ta *tarchive) walk(srcName string) error {
 		}
 
 		// Get a header for the file.
-		hdr, err := ta.getHeader(path, name)
+		hdr, err := t.getHeader(path, name)
 		if err != nil {
 			return err
 		}
 
 		// Write the header.
-		if err := ta.write(hdr, path); err != nil {
+		if err := t.write(hdr, path); err != nil {
 			return err
 		}
 
@@ -129,7 +129,7 @@ func (ta *tarchive) walk(srcName string) error {
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Add a file [as a header] to a tar archive.
-func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
+func (t *tarchive) getHeader(path, name string) (*tar.Header, error) {
 
 	fi, err := os.Lstat(path)
 	if err != nil {
@@ -171,7 +171,7 @@ func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
 	if fi.Mode().IsRegular() && hasHardlinks {
 		// If this file is NOT the first found hardlink to this inode,
 		//   set the previously found hardlink as its 'Linkname'.
-		if firstInode, ok := ta.hardlinks[inode]; ok {
+		if firstInode, ok := t.hardlinks[inode]; ok {
 			hdr.Typeflag = tar.TypeLink
 			hdr.Linkname = firstInode
 			// Set size to 0 when not adding additional inodes.
@@ -183,7 +183,7 @@ func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
 			// It will become the 'Linkname' for another hardlink
 			//   further down in the archive.
 		} else {
-			ta.hardlinks[inode] = name
+			t.hardlinks[inode] = name
 		}
 	}
 
@@ -228,13 +228,13 @@ func tarDir2(src *os.File) (string, error) {
 
 	// Pipe the destination file through a *tarchive.
 	var dstWriter io.WriteCloser = dst
-	ta := &tarchive{
+	t := &tarchive{
 		writer:    tar.NewWriter(dstWriter),
 		hardlinks: make(map[uint64]string),
 	}
 
 	// Remember to close the writer.
-	defer ta.writer.Close()
+	defer t.writer.Close()
 
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
@@ -260,13 +260,13 @@ func tarDir2(src *os.File) (string, error) {
 
 			// Get a header for the file.
 			var hdr *tar.Header
-			hdr, err = ta.getHeader(path, name)
+			hdr, err = t.getHeader(path, name)
 			if err != nil {
 				return err
 			}
 
 			// Write the header.
-			if err = ta.write(hdr, path); err != nil {
+			if err = t.write(hdr, path); err != nil {
 				return err
 			}
 
@@ -305,10 +305,10 @@ func tarDir2(src *os.File) (string, error) {
 	return dstName, nil
 }
 
-func (ta *tarchive) write(hdr *tar.Header, path string) error {
+func (t *tarchive) write(hdr *tar.Header, path string) error {
 
 	// Write the header.
-	tw := ta.writer
+	tw := t.writer
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func (ta *tarchive) write(hdr *tar.Header, path string) error {
 		return err
 	}
 
-	// tb := ta.bufioWriter
+	// tb := t.bufioWriter
 	// var tb *bufio.Writer
 	// tb.Reset(tw)
 	tb := bufio.NewWriter(tw)
