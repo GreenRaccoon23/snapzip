@@ -13,6 +13,7 @@ import (
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 type tarchive struct {
+	dst    *os.File
 	writer *tar.Writer
 	// Map inodes to hardlinks.
 	hardlinks map[uint64]string
@@ -28,6 +29,7 @@ func tarDir(src *os.File) (string, error) {
 		return "", err
 	}
 	srcName := src.Name()
+	srcMode := srcInfo.Mode()
 	baseName := filepath.Base(srcName)
 
 	// Make sure existing files are not overwritten.
@@ -39,18 +41,10 @@ func tarDir(src *os.File) (string, error) {
 		defer print()
 	}
 
-	// Create the destination file.
-	dst, err := create(dstName, srcInfo.Mode())
+	var t *tarchive
+	err = t.open(dstName, srcMode)
 	if err != nil {
 		return "", err
-	}
-	defer dst.Close()
-
-	// Pipe the destination file through a *tarchive.
-	var dstWriter io.WriteCloser = dst
-	t := &tarchive{
-		writer:    tar.NewWriter(dstWriter),
-		hardlinks: make(map[uint64]string),
 	}
 	defer t.close()
 
@@ -62,7 +56,24 @@ func tarDir(src *os.File) (string, error) {
 	return dstName, nil
 }
 
+func (t *tarchive) open(dstName string, mode os.FileMode) error {
+
+	dst, err := create(dstName, mode)
+	if err != nil {
+		return err
+	}
+
+	var dstWriteCloser io.WriteCloser = dst
+
+	t.dst = dst
+	t.writer = tar.NewWriter(dstWriteCloser)
+	t.hardlinks = make(map[uint64]string)
+
+	return nil
+}
+
 func (t *tarchive) close() {
+	t.dst.Close()
 	t.writer.Close()
 	t.hardlinks = nil
 }
