@@ -40,7 +40,7 @@ func tarDir(src *os.File) (string, error) {
 	dstName := concat(baseName, ".tar")
 	setDstName(&dstName)
 
-	var t *tarchive
+	t := &tarchive{}
 	err = t.create(dstName, srcMode)
 	if err != nil {
 		return "", err
@@ -269,7 +269,7 @@ func untar(src *os.File) (string, error) {
 
 	srcName := src.Name()
 
-	var t *tarchive
+	t := &tarchive{}
 	err := t.open(srcName)
 	if err != nil {
 		return "", err
