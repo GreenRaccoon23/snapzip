@@ -250,8 +250,28 @@ func (t *tarchive) write(hdr *tar.Header, path string) error {
 	return tb.Flush()
 }
 
+func (t *tarchive) openReader(dstName string, mode os.FileMode) error {
+
+	dst, err := create(dstName, mode)
+	if err != nil {
+		return err
+	}
+
+	var dstWriteCloser io.WriteCloser = dst
+
+	t.dstName = dstName
+	t.dst = dst
+	t.writer = tar.NewWriter(dstWriteCloser)
+	t.hardlinks = make(map[uint64]string)
+
+	return nil
+}
+
 // Extract a tar archive.
 func untar(src *os.File) (string, error) {
+
+	srcName := src.Name()
+
 	// Get the smallest directory name (top directory).
 	topDir, err := findTopDirInArchive(src)
 	if err != nil {
@@ -266,7 +286,7 @@ func untar(src *os.File) (string, error) {
 	setDstName(&dstName)
 
 	// Re-open the readers.
-	src, err = os.Open(src.Name())
+	src, err = os.Open(srcName)
 	if err != nil {
 		return "", err
 	}
@@ -278,7 +298,6 @@ func untar(src *os.File) (string, error) {
 		return "", err
 	}
 	total := uint64(srcInfo.Size())
-	srcName := srcInfo.Name()
 
 	var progress uint64
 	var outputLength int
