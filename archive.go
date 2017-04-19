@@ -12,7 +12,7 @@ import (
 )
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
-type tarAppender struct {
+type tarchive struct {
 	tarWriter *tar.Writer
 	// Map inodes to hardlinks.
 	hardLinks map[uint64]string
@@ -46,9 +46,9 @@ func tarDir(src *os.File) (string, error) {
 	}
 	defer dst.Close()
 
-	// Pipe the destination file through a *tarAppender.
+	// Pipe the destination file through a *tarchive.
 	var dstWriter io.WriteCloser = dst
-	ta := &tarAppender{
+	ta := &tarchive{
 		tarWriter: tar.NewWriter(dstWriter),
 		hardLinks: make(map[uint64]string),
 	}
@@ -66,7 +66,7 @@ func tarDir(src *os.File) (string, error) {
 
 // Walk through the directory.
 // Add a header to the tar archive for each file encountered.
-func (ta *tarAppender) walk(srcName string) error {
+func (ta *tarchive) walk(srcName string) error {
 
 	var total int
 	var progress int
@@ -129,7 +129,7 @@ func (ta *tarAppender) walk(srcName string) error {
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Add a file [as a header] to a tar archive.
-func (ta *tarAppender) getHeader(path, name string) (*tar.Header, error) {
+func (ta *tarchive) getHeader(path, name string) (*tar.Header, error) {
 
 	fi, err := os.Lstat(path)
 	if err != nil {
@@ -226,9 +226,9 @@ func tarDir2(src *os.File) (string, error) {
 	}
 	defer dst.Close()
 
-	// Pipe the destination file through a *tarAppender.
+	// Pipe the destination file through a *tarchive.
 	var dstWriter io.WriteCloser = dst
-	ta := &tarAppender{
+	ta := &tarchive{
 		tarWriter: tar.NewWriter(dstWriter),
 		hardLinks: make(map[uint64]string),
 	}
@@ -305,7 +305,7 @@ func tarDir2(src *os.File) (string, error) {
 	return dstName, nil
 }
 
-func (ta *tarAppender) write(hdr *tar.Header, path string) error {
+func (ta *tarchive) write(hdr *tar.Header, path string) error {
 
 	// Write the header.
 	tw := ta.tarWriter
