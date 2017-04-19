@@ -276,7 +276,7 @@ func untar(src *os.File) (string, error) {
 	defer t.close()
 
 	// Get the smallest directory name (top directory).
-	headName, err := t.head()
+	headName, err := t.headName()
 	if err != nil {
 		return "", err
 	}
@@ -317,7 +317,7 @@ func (t *tarchive) open(srcName string) error {
 }
 
 // Search a tar file for the top-level directory to be extracted.
-func (t *tarchive) head() (string, error) {
+func (t *tarchive) headName() (string, error) {
 
 	tr := t.reader
 	srcName := t.srcName
