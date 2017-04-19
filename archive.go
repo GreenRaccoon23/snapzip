@@ -13,8 +13,9 @@ import (
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 type tarchive struct {
-	dst    *os.File
-	writer *tar.Writer
+	dstName string
+	dst     *os.File
+	writer  *tar.Writer
 	// Map inodes to hardlinks.
 	hardlinks map[uint64]string
 }
@@ -28,11 +29,10 @@ func tarDir(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	srcName := src.Name()
 	srcMode := srcInfo.Mode()
 	baseName := filepath.Base(srcName)
-
-	// Make sure existing files are not overwritten.
 	dstName := concat(baseName, ".tar")
 	setDstName(&dstName)
 
@@ -42,11 +42,6 @@ func tarDir(src *os.File) (string, error) {
 		return "", err
 	}
 	defer t.close()
-
-	if !DoQuiet {
-		print(concat(srcName, "  >  ", dstName))
-		defer print()
-	}
 
 	err = t.tar(srcName)
 	if err != nil {
@@ -65,6 +60,7 @@ func (t *tarchive) open(dstName string, mode os.FileMode) error {
 
 	var dstWriteCloser io.WriteCloser = dst
 
+	t.dstName = dstName
 	t.dst = dst
 	t.writer = tar.NewWriter(dstWriteCloser)
 	t.hardlinks = make(map[uint64]string)
@@ -76,12 +72,14 @@ func (t *tarchive) close() {
 	t.dst.Close()
 	t.writer.Close()
 	t.hardlinks = nil
+	t = nil
 }
 
 // Walk through the directory.
 // Add a header to the tar archive for each file encountered.
 func (t *tarchive) tar(srcName string) error {
 
+	dstName := t.dstName
 	var total int
 	var progress int
 	var start time.Time
@@ -89,6 +87,11 @@ func (t *tarchive) tar(srcName string) error {
 
 	if !DoQuiet {
 		total = dirSize(srcName)
+	}
+
+	if !DoQuiet {
+		print(concat(srcName, "  >  ", dstName))
+		defer print()
 	}
 
 	return filepath.Walk(srcName, func(path string, fi os.FileInfo, err error) error {
