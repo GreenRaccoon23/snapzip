@@ -285,15 +285,6 @@ func untar(src *os.File) (string, error) {
 	dstName := headName
 	setDstName(&dstName)
 
-	// t.close()
-	//
-	// err = t.open(srcName)
-	// if err != nil {
-	// 	return "", err
-	// }
-	//
-	// defer t.close()
-
 	err = t.untar(dstName, headName)
 	if err != nil {
 		return "", fmt.Errorf("%v\nFailed to extract %v", err, srcName)
