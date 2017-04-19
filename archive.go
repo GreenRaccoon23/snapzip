@@ -36,17 +36,17 @@ func tarDir(src *os.File) (string, error) {
 	dstName := concat(baseName, ".tar")
 	setDstName(&dstName)
 
-	if !DoQuiet {
-		print(concat(srcName, "  >  ", dstName))
-		defer print()
-	}
-
 	var t *tarchive
 	err = t.open(dstName, srcMode)
 	if err != nil {
 		return "", err
 	}
 	defer t.close()
+
+	if !DoQuiet {
+		print(concat(srcName, "  >  ", dstName))
+		defer print()
+	}
 
 	err = t.walk(srcName)
 	if err != nil {
