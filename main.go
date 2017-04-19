@@ -174,15 +174,15 @@ func unsnapAndUntar(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer unsnapped.Close()
 
-	// If the unsnapped file is not a tar archive, don't try to untar it.
+	// If `unsnapped` is not a tar archive, we are done.
 	if !isTar(unsnapped) {
 		return "", nil
 	}
 
-	// Remember to remove the unsnapped tar archive.
+	// Remove the temporary tar archive if nothing dies.
 	defer func() {
-		unsnapped.Close()
 		if err != nil {
 			return
 		}
@@ -213,10 +213,10 @@ func tarAndSnap(src *os.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer tarred.Close()
 
-	// Remember to close and remove the temporary tar archive.
+	// Remove the temporary tar archive if nothing dies.
 	defer func() {
-		tarred.Close()
 		if err != nil {
 			return
 		}
