@@ -43,6 +43,7 @@ func tarDir(src *os.File) (string, error) {
 	setDstName(&dstName)
 
 	t := &tarchive{}
+
 	err = t.create(dstName, srcMode)
 	if err != nil {
 		return "", err
@@ -58,6 +59,7 @@ func tarDir(src *os.File) (string, error) {
 	return dstName, nil
 }
 
+// prepare to tar
 func (t *tarchive) create(dstName string, mode os.FileMode) error {
 
 	dst, err := create(dstName, mode)
@@ -73,20 +75,6 @@ func (t *tarchive) create(dstName string, mode os.FileMode) error {
 	t.hardlinks = make(map[uint64]string)
 
 	return nil
-}
-
-func (t *tarchive) close() {
-
-	if t.dst != nil {
-		t.dst.Close()
-		t.writer.Close()
-		t.hardlinks = nil
-	}
-
-	if t.src != nil {
-		t.src.Close()
-		t.reader = nil
-	}
 }
 
 // Walk through the directory.
@@ -270,6 +258,7 @@ func untar(src *os.File) (string, error) {
 	srcName := src.Name()
 
 	t := &tarchive{}
+
 	err := t.open(srcName)
 	if err != nil {
 		return "", err
@@ -295,6 +284,7 @@ func untar(src *os.File) (string, error) {
 	return dstName, nil
 }
 
+// prepare to untar
 func (t *tarchive) open(srcName string) error {
 
 	src, err := os.Open(srcName)
@@ -475,4 +465,18 @@ func (t *tarchive) untar(dstName string, headName string) error {
 	}
 
 	return nil
+}
+
+func (t *tarchive) close() {
+
+	if t.dst != nil {
+		t.dst.Close()
+		t.writer.Close()
+		t.hardlinks = nil
+	}
+
+	if t.src != nil {
+		t.src.Close()
+		t.reader = nil
+	}
 }
