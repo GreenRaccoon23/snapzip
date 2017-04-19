@@ -183,6 +183,9 @@ func unsnapAndUntar(src *os.File) (string, error) {
 	// Remember to remove the unsnapped tar archive.
 	defer func() {
 		unsnapped.Close()
+		if err != nil {
+			return
+		}
 		os.Remove(unsnappedName)
 	}()
 
@@ -214,9 +217,10 @@ func tarAndSnap(src *os.File) (string, error) {
 	// Remember to close and remove the temporary tar archive.
 	defer func() {
 		tarred.Close()
-		if err == nil {
-			os.Remove(tarredName)
+		if err != nil {
+			return
 		}
+		os.Remove(tarredName)
 	}()
 
 	// Compress it.
