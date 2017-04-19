@@ -13,7 +13,7 @@ import (
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 type tarchive struct {
-	tarWriter *tar.Writer
+	writer *tar.Writer
 	// Map inodes to hardlinks.
 	hardLinks map[uint64]string
 }
@@ -49,12 +49,12 @@ func tarDir(src *os.File) (string, error) {
 	// Pipe the destination file through a *tarchive.
 	var dstWriter io.WriteCloser = dst
 	ta := &tarchive{
-		tarWriter: tar.NewWriter(dstWriter),
+		writer:    tar.NewWriter(dstWriter),
 		hardLinks: make(map[uint64]string),
 	}
 
-	// Remember to close the tarWriter.
-	defer ta.tarWriter.Close()
+	// Remember to close the writer.
+	defer ta.writer.Close()
 
 	err = ta.walk(srcName)
 	if err != nil {
@@ -229,12 +229,12 @@ func tarDir2(src *os.File) (string, error) {
 	// Pipe the destination file through a *tarchive.
 	var dstWriter io.WriteCloser = dst
 	ta := &tarchive{
-		tarWriter: tar.NewWriter(dstWriter),
+		writer:    tar.NewWriter(dstWriter),
 		hardLinks: make(map[uint64]string),
 	}
 
-	// Remember to close the tarWriter.
-	defer ta.tarWriter.Close()
+	// Remember to close the writer.
+	defer ta.writer.Close()
 
 	// Walk through the directory.
 	// Add a header to the tar archive for each file encountered.
@@ -308,7 +308,7 @@ func tarDir2(src *os.File) (string, error) {
 func (ta *tarchive) write(hdr *tar.Header, path string) error {
 
 	// Write the header.
-	tw := ta.tarWriter
+	tw := ta.writer
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
 	}
