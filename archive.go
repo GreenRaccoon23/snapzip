@@ -85,8 +85,6 @@ func (t *tarchive) close() {
 		t.src.Close()
 		t.reader = nil
 	}
-
-	t = nil
 }
 
 // Walk through the directory.
@@ -287,6 +285,15 @@ func untar(src *os.File) (string, error) {
 	dstName := headName
 	setDstName(&dstName)
 
+	// t.close()
+	//
+	// err = t.open(srcName)
+	// if err != nil {
+	// 	return "", err
+	// }
+	//
+	// defer t.close()
+
 	err = t.untar(dstName, headName)
 	if err != nil {
 		return "", fmt.Errorf("%v\nFailed to extract %v", err, srcName)
@@ -320,7 +327,6 @@ func (t *tarchive) head() (string, error) {
 
 	defer func() {
 		t.close()
-		t = &tarchive{}
 		t.open(srcName)
 	}()
 
