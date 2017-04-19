@@ -401,9 +401,7 @@ func untar(file *os.File) error {
 
 		// Make sure existing files are not overwritten.
 		name := hdr.Name
-		fmt.Printf("hdr.Name: %q\n", hdr.Name)
 		name = strings.Replace(name, topDir, dstName, 1)
-		fmt.Printf("name: %q\n", name)
 		unusedFilename(&name)
 
 		switch hdr.Typeflag {
