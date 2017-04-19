@@ -177,7 +177,7 @@ func unsnapAndUntar(src *os.File) (string, error) {
 	defer unsnapped.Close()
 
 	// If `unsnapped` is not a tar archive, we are done.
-	if !isTar(unsnapped) {
+	if done := !isTar(unsnapped); done {
 		return unsnappedName, nil
 	}
 
