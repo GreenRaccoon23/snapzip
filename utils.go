@@ -78,28 +78,29 @@ func setDstName(dstName *string) {
 	if DstDir != "" {
 		*dstName = path.Join(DstDir, *dstName)
 	}
-	unusedFilename(dstName)
+	*dstName = unusedFilename(*dstName)
 }
 
 // Modify a filename to one that has not been used by the system.
-func unusedFilename(filename *string) {
+func unusedFilename(filename string) string {
 
-	if !exists(*filename) {
-		return
+	if !exists(filename) {
+		return filename
 	}
 
-	base, ext := splitExt(*filename)
+	base, ext := splitExt(filename)
 	// Go's date of birth. :)
 	for i := 1; i < 20091110; i++ {
 		// May change this convention later,
-		//   since bash doesn't like the parentheses.
+		//   since bash does not like the parentheses.
 		testname := concat(base, "(", strconv.Itoa(i), ")", ext)
 		if exists(testname) {
 			continue
 		}
-		*filename = testname
-		return
+		return testname
 	}
+
+	return filename
 }
 
 // Split the extension off a filename.
