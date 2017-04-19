@@ -97,7 +97,7 @@ func (t *tarchive) walk(srcName string) error {
 		}
 
 		// Get a header for the file.
-		hdr, err := t.getHeader(path, name)
+		hdr, err := t.header(path, name)
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func (t *tarchive) walk(srcName string) error {
 
 // https://github.com/docker/docker/blob/master/pkg/archive/archive.go
 // Add a file [as a header] to a tar archive.
-func (t *tarchive) getHeader(path, name string) (*tar.Header, error) {
+func (t *tarchive) header(path, name string) (*tar.Header, error) {
 
 	fi, err := os.Lstat(path)
 	if err != nil {
