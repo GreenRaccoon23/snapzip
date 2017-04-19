@@ -277,12 +277,16 @@ func untar(src *os.File) (string, error) {
 	total := uint64(srcInfo.Size())
 	srcName := srcInfo.Name()
 
-	// Extract the archive.
-	print(concat(srcName, "  >  ", dstName))
-	defer print()
 	var progress uint64
 	var outputLength int
 	var start time.Time
+
+	if !DoQuiet {
+		print(concat(srcName, "  >  ", dstName))
+		defer print()
+	}
+
+	// Extract the archive.
 	for {
 		var hdr *tar.Header
 		hdr, err = tr.Next()
