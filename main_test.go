@@ -152,7 +152,7 @@ func TestCleanup(t *testing.T) {
 
 	for _, path := range paths {
 		if err := os.RemoveAll(path); err != nil {
-			t.Error(err)
+			defer t.Error(err)
 		}
 	}
 }
