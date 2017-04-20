@@ -74,10 +74,10 @@ _buildAndroid() {
 
     if [ $? != 0 ]; then
         local statusCode=$?;
-        echo "Build failed for '"${OS_ANDROID}"' on '${ARCH_32_ARM}' architecture";
+        echo "Build failed for '${OS_ANDROID}' on '${ARCH_32_ARM}' architecture";
         exit "${statusCode}";
     else
-        echo "Build successful for '"${OS_ANDROID}"' on '${ARCH_32_ARM}' architecture";
+        echo "Build successful for '${OS_ANDROID}' on '${ARCH_32_ARM}' architecture";
     fi;
 };
 
