@@ -39,13 +39,11 @@ func TestSnap(t *testing.T) {
 	sumExpected := sumRegSnapped
 
 	t.Run("snap", func(t *testing.T) {
-
 		dstName, err := compressOrDecompress(srcName)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-
 		if dstName != dstNameExpected {
 			t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
 			return
@@ -53,13 +51,11 @@ func TestSnap(t *testing.T) {
 	})
 
 	t.Run("sha256sum", func(t *testing.T) {
-
 		sum, err := sha256sum(sumName)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-
 		if sum != sumExpected {
 			t.Errorf("Expected `sum` to be %v but got %v.\n", sumExpected, sum)
 			return
@@ -75,18 +71,15 @@ func TestTarAndSnap(t *testing.T) {
 	dstNameExpected := nameDirSnapped
 
 	t.Run("tarAndSnap", func(t *testing.T) {
-
 		dstName, err := compressOrDecompress(srcName)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-
 		if dstName != dstNameExpected {
 			t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
 			return
 		}
-
 		if exists(tmpName) {
 			t.Errorf("Temporary archive %v should have been removed.\n", tmpName)
 			return
@@ -108,18 +101,15 @@ func TestUnsnapAndUntar(t *testing.T) {
 	sumExpected2 := sumRegSnapped
 
 	t.Run("unsnapAndUntar", func(t *testing.T) {
-
 		dstName, err := compressOrDecompress(srcName)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-
 		if dstName != dstNameExpected {
 			t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
 			return
 		}
-
 		if exists(tmpName) {
 			t.Errorf("Temporary archive %v should have been removed.\n", tmpName)
 			return
@@ -127,13 +117,11 @@ func TestUnsnapAndUntar(t *testing.T) {
 	})
 
 	t.Run("sha256sum1", func(t *testing.T) {
-
 		sum, err := sha256sum(sumName)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-
 		if sum != sumExpected {
 			t.Errorf("Expected `sum` to be %v but got %v.\n", sumExpected, sum)
 			return
@@ -141,13 +129,11 @@ func TestUnsnapAndUntar(t *testing.T) {
 	})
 
 	t.Run("sha256sum2", func(t *testing.T) {
-
 		sum2, err := sha256sum(sumName2)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-
 		if sum2 != sumExpected2 {
 			t.Errorf("Expected `sum2` to be %v but got %v.\n", sumExpected2, sum2)
 			return
