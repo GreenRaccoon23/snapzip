@@ -38,25 +38,33 @@ func TestSnap(t *testing.T) {
 	sumName := nameRegSnapped
 	sumExpected := sumRegSnapped
 
-	dstName, err := compressOrDecompress(srcName)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if dstName != dstNameExpected {
-		t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
-		return
-	}
+	t.Run("snap", func(t *testing.T) {
 
-	sum, err := sha256sum(sumName)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if sum != sumExpected {
-		t.Errorf("Expected `sum` to be %v but got %v.\n", sumExpected, sum)
-		return
-	}
+		dstName, err := compressOrDecompress(srcName)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if dstName != dstNameExpected {
+			t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
+			return
+		}
+	})
+
+	t.Run("sha256sum", func(t *testing.T) {
+
+		sum, err := sha256sum(sumName)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if sum != sumExpected {
+			t.Errorf("Expected `sum` to be %v but got %v.\n", sumExpected, sum)
+			return
+		}
+	})
 }
 
 // TestTarAndSnap tests tar archiving and snappy compression of file.
@@ -66,22 +74,26 @@ func TestTarAndSnap(t *testing.T) {
 	tmpName := nameDirTar
 	dstNameExpected := nameDirSnapped
 
-	dstName, err := compressOrDecompress(srcName)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if dstName != dstNameExpected {
-		t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
-		return
-	}
+	t.Run("tarAndSnap", func(t *testing.T) {
+
+		dstName, err := compressOrDecompress(srcName)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if dstName != dstNameExpected {
+			t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
+			return
+		}
+
+		if exists(tmpName) {
+			t.Errorf("Temporary archive %v should have been removed.\n", tmpName)
+			return
+		}
+	})
 
 	// snappy compressed files do not have a consistent checksum
-
-	if exists(tmpName) {
-		t.Errorf("Temporary archive %v should have been removed.\n", tmpName)
-		return
-	}
 }
 
 // TestUnsnapAndUntar tests tar extraction and snappy decompression of file.
@@ -95,40 +107,52 @@ func TestUnsnapAndUntar(t *testing.T) {
 	sumName2 := nameRegSnappedUnsnapped
 	sumExpected2 := sumRegSnapped
 
-	dstName, err := compressOrDecompress(srcName)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if dstName != dstNameExpected {
-		t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
-		return
-	}
+	t.Run("unsnapAndUntar", func(t *testing.T) {
 
-	sum, err := sha256sum(sumName)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if sum != sumExpected {
-		t.Errorf("Expected `sum` to be %v but got %v.\n", sumExpected, sum)
-		return
-	}
+		dstName, err := compressOrDecompress(srcName)
+		if err != nil {
+			t.Error(err)
+			return
+		}
 
-	sum2, err := sha256sum(sumName2)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	if sum2 != sumExpected2 {
-		t.Errorf("Expected `sum2` to be %v but got %v.\n", sumExpected2, sum2)
-		return
-	}
+		if dstName != dstNameExpected {
+			t.Errorf("Expected `dstName` to be %v but got %v.\n", dstNameExpected, dstName)
+			return
+		}
 
-	if exists(tmpName) {
-		t.Errorf("Temporary archive %v should have been removed.\n", tmpName)
-		return
-	}
+		if exists(tmpName) {
+			t.Errorf("Temporary archive %v should have been removed.\n", tmpName)
+			return
+		}
+	})
+
+	t.Run("sha256sum1", func(t *testing.T) {
+
+		sum, err := sha256sum(sumName)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if sum != sumExpected {
+			t.Errorf("Expected `sum` to be %v but got %v.\n", sumExpected, sum)
+			return
+		}
+	})
+
+	t.Run("sha256sum2", func(t *testing.T) {
+
+		sum2, err := sha256sum(sumName2)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if sum2 != sumExpected2 {
+			t.Errorf("Expected `sum2` to be %v but got %v.\n", sumExpected2, sum2)
+			return
+		}
+	})
 }
 
 // TestCleanup removes files created by this test.
